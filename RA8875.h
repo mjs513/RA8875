@@ -2,7 +2,7 @@
 	--------------------------------------------------
 	RA8875 LCD/TFT Graphic Controller Driver Library
 	--------------------------------------------------
-	Version:0.70b11p7
+	Version:0.70b11p11
 	++++++++++++++++++++++++++++++++++++++++++++++++++
 	Written by: Max MC Costa for s.u.m.o.t.o.y
 	++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -38,7 +38,17 @@ Paul Stoffregen, the 'guru' behind many arduino magic, the father of Teensy
 Bill Greyman, another 'maestro', greatly inspired many coders
 Jnmattern & Marek Buriak for drawArc
 Last but not less important the contributors and beta tester of this library:
-M.Sandercrock, the experimentalist, and many others
+M.Sandercrock, the experimentalist, MrTom and many others
+-------------------------------------------------------------------------------------
+				>>>>>>>>>>>> Current version notes <<<<<<<<<<<<<<<
+-------------------------------------------------------------------------------------
+	0.70b11p8 changes: Fixed some small error (thanks Mr TOM) that affects drawLine
+	and drawLineAngle. Initial support for SPARK devices (very early development)
+	Fixed a couple of examples.
+	0.70b11p9 changes: Now compile with particle spark! But spark development toolchain it's a nightmare so 
+	use https://github.com/sumotoy/spark_ra8875
+	0.70b11p10: Some changes proposed by MrTom to fix the triangle hardware bug of RA8875
+	0.70b11p11: Minor changes on triangles helper (MrTom)
 -------------------------------------------------------------------------------------
 				>>>>>>>>>>>>>>>>>>>>> Wiring <<<<<<<<<<<<<<<<<<<<<<<<<
 -------------------------------------------------------------------------------------
@@ -97,8 +107,18 @@ SD CS:		pin 2  (selectable 3*)
 SD CARD ID: pin xx (selectable and optional)
 *(3) On Teensy3.x not all pin are usable for CS's! 
 can be used: 2,6,9,10,15,20,21,22,23
+-------------------------------------------------------------------------------------
+TFT side	Particle Spark  (caution, never tested!)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+CLK:		 	A3
+MOSI:			A5
+MISO:			A4
+CS:				A2
+INT:		
+SDA:			D0
+SCL:			D1
 
-
+Benchmark results for reference --------------------------------------
 Screen fill              16635		16585		16561		8326
 Test Pixel               60			77			63			53
 Test Pixels              39780		52085		41885		35412
@@ -126,11 +146,13 @@ CS       10		53           YES       CS
 #ifndef _RA8875MC_H_
 #define _RA8875MC_H_
 
-#include "_settings/RA8875_CPU_commons.h"
+#include "_includes/RA8875_CPU_commons.h"
+
 
 #if !defined(swapvals)
-	#if defined(__XTENSA__)
+	#if defined(ESP8266)
 		#define swapvals(a, b) { int16_t t = a; a = b; b = t; }
+		//#define swapvals(a, b) { typeid(a) t = a; a = b; b = t; }
 	#else
 		#define swapvals(a, b) { typeof(a) t = a; a = b; b = t; }
 	#endif
@@ -139,7 +161,7 @@ CS       10		53           YES       CS
 enum RA8875sizes { 			RA8875_480x272, RA8875_800x480, RA8875_800x480ALT, Adafruit_480x272, Adafruit_800x480 };
 enum RA8875tcursor { 		NOCURSOR=0,IBEAM,UNDER,BLOCK };//0,1,2,3
 enum RA8875tsize { 			X16=0,X24,X32 };//0,1,2
-enum RA8875fontSource { 	INT=0, EXT };//0,1
+enum RA8875fontSource { 	INTFONT=0, EXTFONT };//0,1
 enum RA8875fontCoding { 	ISO_IEC_8859_1, ISO_IEC_8859_2, ISO_IEC_8859_3, ISO_IEC_8859_4 };
 enum RA8875extRomType { 	GT21L16T1W, GT21H16T1W, GT23L16U2W, GT30L16U2W, GT30H24T3Y, GT23L24T3Y, GT23L24M1Z, GT23L32S4W, GT30H32S4W, GT30L32S4W, ER3303_1, ER3304_1, ER3301_1 };
 enum RA8875extRomCoding { 	GB2312, GB12345, BIG5, UNICODE, ASCII, UNIJIS, JIS0208, LATIN };
@@ -164,12 +186,13 @@ Katakana:   \u30A0 -> \u30FF	/u30
 CJK-Uni:	\u4E00 -> \u9FD5	/u4E ... /u9F
 */
 /* ----------------------------DO NOT TOUCH ANITHING FROM HERE ------------------------*/
-#include "_settings/font.h"
-#include "_settings/RA8875Registers.h"
-#include "_settings/RA8875ColorPresets.h"
+
+#include "_includes/font.h"
+#include "_includes/RA8875Registers.h"
+#include "_includes/RA8875ColorPresets.h"
 #include "_settings/RA8875UserSettings.h"
 
-#if defined(_FORCE_PROGMEM__)
+#if defined(_FORCE_PROGMEM__) && !defined(ESP8266)
 template <typename T> T PROGMEM_read (const T * sce)
   {
   static T temp;
@@ -178,9 +201,7 @@ template <typename T> T PROGMEM_read (const T * sce)
   }
 #endif
 
-// using capacitive touch on due with alternative wire1 instead wire
-#if defined(USE_FT5206_TOUCH) && defined(___DUESTUFF) && defined(USE_DUE_WIRE1_INTERFACE)
-#endif
+
 
 #if defined(__MKL26Z64__)
 	static bool _altSPI;
@@ -189,6 +210,9 @@ template <typename T> T PROGMEM_read (const T * sce)
 	static volatile uint32_t _SPImaxSpeed;//holder for SPI speed
 #endif
 
+#if defined(ESP8266) && defined(_FASTSSPORT)
+	#include <eagle_soc.h>
+#endif
 
 
 class RA8875 : public Print {
@@ -196,11 +220,15 @@ class RA8875 : public Print {
 	// void 		debugData(uint16_t data,uint8_t len=8);
 	// void 		showLineBuffer(uint8_t data[],int len);
 //------------- INSTANCE -------------------------------------------------------------------
-	#if defined(__MK20DX128__) || defined(__MK20DX256__)//Teensy 3.0, Teensy 3.1
+	#if defined(__MK20DX128__) || defined(__MK20DX256__) || defined(__MK64FX512__) || defined(__MK66FX1M0__) || defined(__IMXRT1062__)
 		RA8875(const uint8_t CSp,const uint8_t RSTp=255,const uint8_t mosi_pin=11,const uint8_t sclk_pin=13,const uint8_t miso_pin=12);
-	#elif defined(__MKL26Z64__)//TeensyLC with FT5206_TOUCH
+	#elif defined(__MKL26Z64__)//TeensyLC
+		RA8875(const uint8_t CSp,const uint8_t RSTp=255,const uint8_t mosi_pin=11,const uint8_t sclk_pin=13,const uint8_t miso_pin=12);
+	#elif defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__)	
 		RA8875(const uint8_t CSp,const uint8_t RSTp=255,const uint8_t mosi_pin=11,const uint8_t sclk_pin=13,const uint8_t miso_pin=12);
 	#elif defined(___DUESTUFF)//DUE
+		RA8875(const uint8_t CSp, const uint8_t RSTp=255);
+	#elif defined(SPARK)//SPARK
 		RA8875(const uint8_t CSp, const uint8_t RSTp=255);
 	#elif defined(NEEDS_SET_MODULE)//ENERGIA
 		RA8875::RA8875(const uint8_t module, const uint8_t RSTp=255);
@@ -282,7 +310,7 @@ class RA8875 : public Print {
 	uint8_t 	getFontHeight(boolean inRows=false);
 	//----------FONT -------------------------------------------------------------------------
 	void		setExternalFontRom(enum RA8875extRomType ert, enum RA8875extRomCoding erc,enum RA8875extRomFamily erf=STANDARD);
-	void 		setFont(enum RA8875fontSource s);//INT,EXT (if you have a chip installed)
+	void 		setFont(enum RA8875fontSource s);//INTFONT,EXTFONT (if you have a chip installed)
 	//void 		setFont(const struct FONT_DEF *	fnt);
 	void		setFont(const tFont *font);
 	void 		setIntFontCoding(enum RA8875fontCoding f);
@@ -450,7 +478,7 @@ using Print::write;
 	#endif
 
 	
-	#if defined(___TEENSYES)//all of them (32 bit only)
+	#if defined(TEENSYDUINO)//all of them (32 bit only)
 		uint8_t 				  _cs;
 		uint8_t 				  _miso, _mosi, _sclk;
 	#elif defined(ENERGIA)
@@ -459,6 +487,18 @@ using Print::write;
 		#if defined(___DUESTUFF)
 			#if defined(_FASTSSPORT)
 				uint32_t 		  _cs, cspinmask;
+			#else
+				uint8_t 		  _cs;
+			#endif
+		#elif defined(ESP8266)	
+			#if defined(_FASTSSPORT)
+				uint32_t 		  _cs;
+			#else
+				uint8_t 		  _cs;
+			#endif
+		#elif defined(SPARK)
+			#if defined(_FASTSSPORT)
+				uint32_t 		  _cs;
 			#else
 				uint8_t 		  _cs;
 			#endif
@@ -584,6 +624,7 @@ using Print::write;
 	void 		_circle_helper(int16_t x0, int16_t y0, int16_t r, uint16_t color, bool filled);
 	void 		_rect_helper(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color, bool filled);
 	void 		_roundRect_helper(int16_t x, int16_t y, int16_t w, int16_t h, int16_t r, uint16_t color, bool filled);
+	float		_check_area(int16_t Ax, int16_t Ay, int16_t Bx, int16_t By, int16_t Cx, int16_t Cy);
 	void 		_triangle_helper(int16_t x0, int16_t y0, int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint16_t color, bool filled);
 	void 		_ellipseCurve_helper(int16_t xCenter, int16_t yCenter, int16_t longAxis, int16_t shortAxis,uint8_t curvePart, uint16_t color, bool filled);
 	void 		_drawArc_helper(uint16_t cx, uint16_t cy, uint16_t radius, uint16_t thickness, float startAngle, float endAngle, uint16_t color);
@@ -595,39 +636,48 @@ using Print::write;
 	void 		_charLineRender(bool lineBuffer[],int charW,int16_t x,int16_t y,int16_t currentYposition,uint16_t fcolor);
 	#endif
 	
+	
 	//convert a 16bit color(565) into 8bit color(332) as requested by RA8875 datasheet
-	inline __attribute__((always_inline))
-		uint8_t _color16To8bpp(uint16_t color) {
-			return ((color & 0x3800) >> 6 | (color & 0x00E0) >> 3 | (color & 0x0003));
-		}
+	//inline __attribute__((always_inline))
+	uint8_t _color16To8bpp(uint16_t color) 
+		__attribute__((always_inline)) {
+		return (map((color & 0xF800) >> 11, 0,28, 0,7)<<5 | map((color & 0x07E0) >> 5, 0,56, 0,7)<<2 | map(color & 0x001F, 0,24, 0,3));
+	}
 		
-	inline __attribute__((always_inline)) 
-		void _checkLimits_helper(int16_t &x,int16_t &y){
+	//inline __attribute__((always_inline)) 
+	void _checkLimits_helper(int16_t &x,int16_t &y)
+		__attribute__((always_inline)) {
 			if (x < 0) x = 0;
 			if (y < 0) y = 0;
 			if (x >= RA8875_WIDTH) x = RA8875_WIDTH - 1;
 			if (y >= RA8875_HEIGHT) y = RA8875_HEIGHT -1;
 			x = x;
 			y = y;
-		}
+	}
 		
-	inline __attribute__((always_inline)) 	
-		void _center_helper(int16_t &x, int16_t &y){
+	//inline __attribute__((always_inline)) 	
+	void _center_helper(int16_t &x, int16_t &y)
+		__attribute__((always_inline)) {
 			if (x == CENTER) x = _width/2;
 			if (y == CENTER) y = _height/2;
-		}
-	#if defined(___TEENSYES)//all of them (32 bit only)
+	}
+	#if defined(TEENSYDUINO)//all of them (32 bit only)
 		// nothing, already done
 	#elif defined(ENERGIA)
 		// TODO
 	#else
-		#if defined(___DUESTUFF)
-		// DUE
+		#if defined(___DUESTUFF) // DUE
 			#if defined(_FASTSSPORT)
 				volatile uint32_t *csport;
 			#endif
-		#else
-		// AVR,XTENSA,ARM (not DUE),STM,CHIPKIT
+		#elif defined(ESP8266) // ESP8266
+				uint32_t _pinRegister(uint8_t pin)
+				__attribute__((always_inline)) {
+					return _BV(pin);
+				}
+		#elif defined(SPARK)
+			// Mmmm, dunno... put nothing for now
+		#else// AVR,ARM (not DUE),STM,CHIPKIT
 	    //TODO:must check if all processor are compatible
 			#if defined(_FASTSSPORT)
 				volatile uint8_t *csport;
@@ -635,62 +685,83 @@ using Print::write;
 		#endif
 	#endif
     // Low level access  commands ----------------------
-	inline __attribute__((always_inline)) 
-	void _startSend(){
+	
+	//inline __attribute__((always_inline)) 
+	void _startSend()
+		__attribute__((always_inline)) {
 		#if defined(SPI_HAS_TRANSACTION)
 			#if defined(__MKL26Z64__)	
 				_altSPI == true ? SPI1.beginTransaction(SPISettings(_SPImaxSpeed, MSBFIRST, SPI_MODE3)) : SPI.beginTransaction(SPISettings(_SPImaxSpeed, MSBFIRST, SPI_MODE3));
+			#elif defined(ESP8266)	
+				SPI.beginTransaction(SPISettings(_SPImaxSpeed, MSBFIRST, SPI_MODE3));//it works, anyway ESP doesn't work in MODE3!
+			#elif defined(SPARK)	
+				SPI.beginTransaction(SPISettings(_SPImaxSpeed, MSBFIRST, SPI_MODE0));//TODO !
 			#else
 				SPI.beginTransaction(SPISettings(_SPImaxSpeed, MSBFIRST, SPI_MODE3));
 			#endif
-		#elif !defined(ENERGIA) && !defined(SPI_HAS_TRANSACTION) && !defined(___STM32STUFF)
+		#elif !defined(ENERGIA) && !defined(SPI_HAS_TRANSACTION) && !defined(___STM32STUFF) && !defined(ESP8266) && !defined(SPARK)
 			cli();//protect from interrupts
 		#endif//end has transaction
-		#if defined(___TEENSYES)//all of them (32 bit only)
+		
+		#if defined(TEENSYDUINO)//all of them (32 bit only)
 			digitalWriteFast(_cs, LOW);
-		#else
-			#if !defined(ENERGIA)//UNO,DUE,ETC.
-				#if defined(___DUESTUFF) && defined(SPI_DUE_MODE_EXTENDED)//DUE extended SPI
-					//nothing
-				#else//DUE (normal),UNO,ETC.
-					#if defined(_FASTSSPORT)
-						*csport &= ~cspinmask;
-					#else
-						digitalWrite(_cs, LOW);
-					#endif
-				#endif
-			#else//ENERGIA
-				digitalWrite(_cs, LOW);
-			#endif
-		#endif
-	}
-	
-	inline __attribute__((always_inline)) 
-	void _endSend(){
-	#if defined(___TEENSYES)//all of them (32 bit only)
-		digitalWriteFast(_cs, HIGH);
-	#else
-		#if !defined(ENERGIA)
+		#elif !defined(ENERGIA)//UNO,DUE,ETC.
 			#if defined(___DUESTUFF) && defined(SPI_DUE_MODE_EXTENDED)//DUE extended SPI
 				//nothing
 			#else//DUE (normal),UNO,ETC.
-				#if defined(_FASTSSPORT)
-					*csport |= cspinmask;
+				#if defined(ESP8266)	
+					#if defined(_FASTSSPORT)
+						GPIO_REG_WRITE(GPIO_OUT_W1TC_ADDRESS, _pinRegister(_cs));//L
+					#else
+						digitalWrite(_cs, LOW);// for now
+					#endif
+				#elif defined(SPARK)
+					pinResetFast(_cs);
+				#elif !defined(ESP8266) && defined(_FASTSSPORT)
+					*csport &= ~cspinmask;
 				#else
-					digitalWrite(_cs, HIGH);
+					digitalWrite(_cs, LOW);
 				#endif
 			#endif
 		#else//ENERGIA
-			digitalWrite(_cs, HIGH);
+			digitalWrite(_cs, LOW);
 		#endif
+	}
+	
+	//inline __attribute__((always_inline)) 
+	void _endSend()
+		__attribute__((always_inline)) {
+	#if defined(TEENSYDUINO)//all of them (32 bit only)
+		digitalWriteFast(_cs, HIGH);
+	#elif !defined(ENERGIA)
+		#if defined(___DUESTUFF) && defined(SPI_DUE_MODE_EXTENDED)//DUE extended SPI
+			//nothing
+		#else//DUE (normal),UNO,ETC.
+			#if defined(ESP8266)	
+				#if defined(_FASTSSPORT)
+					GPIO_REG_WRITE(GPIO_OUT_W1TS_ADDRESS, _pinRegister(_cs));//H
+				#else
+					digitalWrite(_cs, HIGH);
+				#endif
+			#elif defined(SPARK)
+				pinSetFast(_cs);
+			#elif !defined(ESP8266) && defined(_FASTSSPORT)
+				*csport |= cspinmask;
+			#else
+				digitalWrite(_cs, HIGH);
+			#endif
+		#endif
+	#else//ENERGIA
+		digitalWrite(_cs, HIGH);
 	#endif
+	
 	#if defined(SPI_HAS_TRANSACTION)
 		#if defined(__MKL26Z64__)	
 			_altSPI == true ? SPI1.endTransaction() : SPI.endTransaction();
 		#else
 			SPI.endTransaction();
 		#endif
-	#elif !defined(ENERGIA) && !defined(SPI_HAS_TRANSACTION) && !defined(___STM32STUFF)
+	#elif !defined(ENERGIA) && !defined(SPI_HAS_TRANSACTION) && !defined(___STM32STUFF) && !defined(ESP8266) && !defined(SPARK)
 		sei();//enable interrupts
 	#endif
 } 
@@ -706,9 +777,9 @@ using Print::write;
 	#endif
 
 #if defined(_FASTCPU)
-inline __attribute__((always_inline)) 
+//inline __attribute__((always_inline)) 
 void _slowDownSPI(bool slow,uint32_t slowSpeed=10000000UL)
-{
+	__attribute__((always_inline)) {
 	#if defined(SPI_HAS_TRANSACTION)
 		if (slow){
 			_SPImaxSpeed = slowSpeed;
@@ -742,23 +813,26 @@ void _slowDownSPI(bool slow,uint32_t slowSpeed=10000000UL)
 #endif
 
 #if defined(__AVR__)
-	inline __attribute__((always_inline))
-		void _spiwrite16(uint16_t d) {
+	//inline __attribute__((always_inline))
+		void _spiwrite16(uint16_t d) 
+			__attribute__((always_inline)) {
 			SPDR = highByte(d);
 			while (!(SPSR & _BV(SPIF)));
 			SPDR = lowByte(d);
 			while (!(SPSR & _BV(SPIF)));
 		}
 
-	inline __attribute__((always_inline))
-		void _spiwrite(uint8_t c) {
+	//inline __attribute__((always_inline))
+		void _spiwrite(uint8_t c) 
+			__attribute__((always_inline)) {
 			SPDR = c;
 			//asm volatile("nop");
 			while (!(SPSR & _BV(SPIF)));
 		}
 		
-	inline __attribute__((always_inline))
-		uint8_t _spiread(void) {
+	//inline __attribute__((always_inline))
+		uint8_t _spiread(void) 
+			__attribute__((always_inline)) {
 			uint8_t r = 0;
 			SPDR = 0x00;
 			//asm volatile("nop");
@@ -766,6 +840,24 @@ void _slowDownSPI(bool slow,uint32_t slowSpeed=10000000UL)
 			r = SPDR;
 			return r;
 		}
+#elif defined(SPARK)
+		void _spiwrite16(uint16_t d) 
+			__attribute__((always_inline)) {
+			SPI.transfer(d >> 8);
+			SPI.transfer(d & 0xFF);
+		}
+
+		void _spiwrite(uint8_t c) 
+			__attribute__((always_inline)) {
+			SPI.transfer(c);
+		}
+		
+		uint8_t _spiread(void) 
+			__attribute__((always_inline)) {
+			uint8_t r = SPI.transfer(0x00);
+			return r;
+		}
+		
 #endif
 };
 #endif
