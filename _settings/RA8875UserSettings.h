@@ -62,6 +62,15 @@ Please choose at list one (NOT both), if you comment both it's the same as _AVOI
 //#define USE_RA8875_TOUCH//resistive touch screen
 //#define USE_FT5206_TOUCH//capacitive touch screen
 
+
+
+/* [ONLY ADAFRUIT USERS - Weird rotation issue on some 800x480 adafruit display] +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+An user had a strange rotation problem with an Adafruit 800x480 display. If this happen to you
+(only if this happen!) please try to uncomment the following line.
+Default:commented
+*/
+//#define USE_ADAFRUIT_PHASE_FIXUP
+
 /* [USE ALTERNATIVE I2C/WIRE ON ARDUINO DUE] +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 Arduino DUE has 2 I2C interfaces, default use Wire but you can force library to use Wire1.
 Just uncomment the line below, this option works only for Arduino DUE and has NO effects
@@ -176,7 +185,7 @@ DO NOT Exceed 23Mhz for RA8875! It will result in garbage on screen or run very 
 
 #if defined(SPI_HAS_TRANSACTION)
 //SPI transaction enabled library----------------------
-	#if defined(__MK20DX128__) || defined(__MK20DX256__) //[Teensy 3.0 , 3.1 , 3.2]
+	#if defined(__MK20DX128__) || defined(__MK20DX256__)  || defined(__MK64FX512__) || defined(__MK66FX1M0__) || defined(__IMXRT1062__)
 		const static uint32_t MAXSPISPEED	= 22000000UL;  //don't go higher than 22000000!;
 	#elif defined(__MKL26Z64__)							 //[Teensy LC] (12 or 24 Mhz max)
 		const static uint32_t MAXSPISPEED	= 12000000UL;	 //default SPI main speed TeensyLC
@@ -184,6 +193,11 @@ DO NOT Exceed 23Mhz for RA8875! It will result in garbage on screen or run very 
 	#elif defined(___DUESTUFF)							 //[DUE]
 		const static uint32_t MAXSPISPEED	= 15000000UL;  // try experiment higher values but NOT over 22000000!
 		//#define _FASTSSPORT
+	#elif defined(ESP8266)	
+		const static uint32_t MAXSPISPEED	= 8000000UL;  //don't go higher than 22000000!;
+		//#define _FASTSSPORT
+	#elif defined(SPARK)
+		const static uint32_t MAXSPISPEED	= 8000000UL;  //don't go higher than 22000000!;
 	// TODO: add more CPU here!
 	#else												 //rest of the world (UNO, etc)
 		const static uint32_t MAXSPISPEED	= 10000000UL;  //be careful, higher values result in extremely slow rendering!
@@ -221,6 +235,14 @@ DO NOT Exceed 23Mhz for RA8875! It will result in garbage on screen or run very 
 			#define SPI_SPEED_READ 		SPI_CLOCK_DIV8
 			#define SPI_SPEED_SAFE 		SPI_CLOCK_DIV6	//10.5Mhz
 			//#define _FASTSSPORT
+		#elif defined(ESP8266)//legacy
+			#define SPI_SPEED_WRITE 	SPI_CLOCK_DIV4	//8mhz
+			#define SPI_SPEED_READ 		SPI_CLOCK_DIV8
+			#define SPI_SPEED_SAFE 		SPI_CLOCK_DIV4	//8
+		#elif defined(SPARK)//Really early development (72MHz )
+			#define SPI_SPEED_WRITE 	SPI_CLOCK_DIV8	//9mhz
+			#define SPI_SPEED_READ 		SPI_CLOCK_DIV4	//18Mhz
+			#define SPI_SPEED_SAFE 		SPI_CLOCK_DIV8	//9
 		#else
 		// TODO: Add more CPU here!
 	//rest of the world included UNO, etc.
@@ -242,7 +264,7 @@ DO NOT Exceed 23Mhz for RA8875! It will result in garbage on screen or run very 
 	#elif !defined(USE_RA8875_TOUCH) && !defined(USE_FT5206_TOUCH)
 		#define _AVOID_TOUCHSCREEN
 	#elif defined(USE_FT5206_TOUCH) && !defined(USE_RA8875_TOUCH)
-		#include "Wire.h"//include the support for FT5206
+		//#include "Wire.h"//include the support for FT5206
 		static const uint8_t _FT5206REgisters[9] = {
 			0x16,0x3C,0xE9,0x01,0x01,0xA0,0x0A,0x06,0x28
 		};

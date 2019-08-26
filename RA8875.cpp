@@ -379,9 +379,26 @@ void RA8875::begin(const enum RA8875sizes s,uint8_t colors)
 		pinMode(_cs, OUTPUT);
 		SPI.begin();
 		digitalWrite(_cs, HIGH);
-	#elif defined(__MK64FX512__) || defined(__MK66FX1M0__)	 || defined(__IMXRT1062__)//future teensys
+	#elif defined(__MK64FX512__) || defined(__MK66FX1M0__)//future teensys
 		//always uses SPI transaction
 		if ((_mosi == 11 || _mosi == 7) && (_miso == 12 || _miso == 8) && (_sclk == 13 || _sclk == 14)) {//valid SPI pins?
+			if (_mosi != 11) SPI.setMOSI(_mosi);
+			if (_miso != 12) SPI.setMISO(_miso);
+			if (_sclk != 13) SPI.setSCK(_sclk);
+		} else {
+			_errorCode |= (1 << 1);//set
+			return;
+		}
+		if (!SPI.pinIsChipSelect(_cs)) {
+			_errorCode |= (1 << 2);//set
+			return;
+		}
+		pinMode(_cs, OUTPUT);
+		SPI.begin();
+		digitalWrite(_cs, HIGH);
+	#elif defined(__IMXRT1062__)
+		//always uses SPI transaction
+		if ((_mosi == 11 || _mosi == 26 || _mosi == 35) && (_miso == 12 || _miso == 1 || _miso == 34) && (_sclk == 13 || _sclk == 27 || _sclk == 36)) {//valid SPI pins?
 			if (_mosi != 11) SPI.setMOSI(_mosi);
 			if (_miso != 12) SPI.setMISO(_miso);
 			if (_sclk != 13) SPI.setSCK(_sclk);
@@ -4977,7 +4994,7 @@ void RA8875::useINT(const uint8_t INTpin,const uint8_t INTnum)
 {
 	_intPin = INTpin;
 	_intNum = INTnum;
-	#if defined(TEENSYDUINO)//all of them (32 bit only)
+	#if defined(___TEENSYES)//all of them (32 bit only)
 		pinMode(_intPin ,INPUT_PULLUP);
 	#else
 		pinMode(_intPin ,INPUT);
@@ -5088,7 +5105,7 @@ void RA8875::useCapINT(const uint8_t INTpin,const uint8_t INTnum)
 {
 	_intCTSPin = INTpin;
 	_intCTSNum = INTnum;
-	#if defined(TEENSYDUINO)//all of them (32 bit only)
+	#if defined(___TEENSYES)//all of them (32 bit only)
 		pinMode(_intCTSPin ,INPUT_PULLUP);
 	#else
 		pinMode(_intCTSPin ,INPUT);
@@ -5202,7 +5219,7 @@ bool RA8875::touched(bool safe)
 			
 			#elif defined(USE_RA8875_TOUCH)
 				if (_touchEnabled){
-					#if defined(TEENSYDUINO)
+					#if defined(___TEENSYES)
 						if (!digitalReadFast(_intPin)) {
 					#else
 						if (!digitalRead(_intPin)) {
@@ -5406,7 +5423,7 @@ void RA8875::touchBegin(void)
 		6,5,4:TP Sample Time Adjusting (000...111)
 		3:Touch Panel Wakeup Enable 0(disable),1(enable)
 		2,1,0:ADC Clock Setting (000...111) set fixed to 010: (System CLK) / 4, 10Mhz Max! */
-		#if defined(TEENSYDUINO) ||  defined(___DUESTUFF)//fast 32 bit processors
+		#if defined(___TEENSYES) ||  defined(___DUESTUFF)//fast 32 bit processors
 			_writeRegister(RA8875_TPCR0, TP_ENABLE | TP_ADC_SAMPLE_16384_CLKS | TP_ADC_CLKDIV_32);
 		#else
 			_writeRegister(RA8875_TPCR0, TP_ENABLE | TP_ADC_SAMPLE_4096_CLKS | TP_ADC_CLKDIV_16);

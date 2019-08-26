@@ -1,10 +1,10 @@
-RA8875 library b11 [early release]
-==============================
+RA8875 library b11p10 [Testing gold release]
+===========================================
 
 **Wiki added!** https://github.com/sumotoy/RA8875/wiki<br>
-This is the last <b>stable</b> release, the very <b>last 'development'</b> version is here:<br>
-https://github.com/sumotoy/RA8875/tree/0.70b11<br>
-<b>The development version has the last changes and bug fixes so please use it!</b><br>
+This is the last <b>'development'</b> version, last known <b>stable</b> version is here:<br>
+https://github.com/sumotoy/RA8875/tree/0.70<br>
+The development release normally contain bug fixes so it's almost safe to use but if you have problems you can switch back to the stable release (I try to keep as stable I can)<br>
 Moved a lot of 'bla bla' in the wiki, readme cleaned.
 
 ##### Current version 0.70b11, Please read!!!.<br>
@@ -36,6 +36,22 @@ Moved a lot of 'bla bla' in the wiki, readme cleaned.
 
 **0.70b11p6** changes...<br>
  - Fixed a stupid error in setFontScale (was inverted), some improvements in several drawings functions, added ER3301_1 font rom.<br>
+
+**0.70b11p7** changes...<br>
+ - Added an user option in _settings/RA8875UserSettings.h to use alternative Wire1 on Arduino DUE, experimental since I'm actually don't have a DUE.<br>
+
+**0.70b11p8** changes...(will be downloadable in few hours)<br>
+ - Fixed some small bugs (thanks Mr Tom), added some extra support for different CPU's, fixed a couple of examples.
+ - Introduced some major changes in initialization, it seems works but better check with differents MCU's before apply as 'gold master'<br>
+
+
+**0.70b11p9** changes...<br>
+ - Fixed compiling compatibility with Particle Spark<br>
+
+**0.70b11p10** changes...<br>
+ - Added initial support for incoming Teensy's
+ - Some changes from MrTom accepted, should fix an hardware bug in trianles and some other minor things
+ - Created _includes folder and moved from settings some file that should never change, this will help users to save their settings between updates.<br>
  
 
 Current beta **tested only with**:
@@ -45,22 +61,34 @@ Current beta **tested only with**:
  All tested with Teensy 3.0, Teensy 3.1, Teensy LC, Arduino DUE, Arduino UNO, Arduino MEGA<br>
 Check 'Proof of working' in wiki.<br>
 
-##### Not Working? <br>
-I have tested 0.70b11 with several CPU and <b>worked</b>:<br>
+##### Not Working? Check here!<br>
+<b>I have tested 0.70b11 with several CPU and <b>worked</b>:</b><br>
  - Teensy 3.1
  - Teensy 3.0
  - Teensy LC
  - Arduino UNO
+ - Arduino Leonardo
  - Arduino NANO
  - Arduino DUE
  - Arduino MEGA
  - Arduino YUN
- Display tested:
+ - Many arduino variants based on AVR
+ <br>
+ <b>Display tested:</b><br>
  - EastRising RA8875 5" (480x272)
  - EastRising RA8875 5" (800x480)
  - EastRising RA8875 7" (800x480)
  - Adafruit (480x272) 
  - Adafruit (800x480)<br>
+ <b>Planned but still not working:</b>
+ - Energia (basic support added but never tested)
+ - ESP8266 (compile but several problems with HEAP and PROGMEM to fix)
+ - SPARK (early development, NEVER tested)<br>
+ <b>Currently not working (needs library changes and support):</b>
+ - Arduino ZERO
+ - Raspberry (there's alternative libraries for this since many uses python)
+ - STM ARM processors (one day, for sure)<br>
+ <br>
  If your display not works, please check your connections, supply values, etc.<br>
  Remember it's an SPI connection so there's hardware limitations on some CPU, for example DUE can use as CS pin 4,10   or 52, Teensy can use more but not all, 8 Bit arduino can use almost any, etc..<br>
  Still not working? Check my wiki, **check carefully!**<br>
