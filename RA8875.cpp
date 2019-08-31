@@ -362,7 +362,7 @@ void RA8875::begin(const enum RA8875sizes s,uint8_t colors)
 	_INTC1_Reg = 0b00000000;
 
 	//------------------------------- Start SPI initialization ------------------------------------------
-	#if defined(__MK20DX128__) || defined(__MK20DX256__) || defined(__MK64FX512__) || defined(__MK66FX1M0__) || defined(__IMXRT1062__)
+	#if defined(__MK20DX128__) || defined(__MK20DX256__)
 		//always uses SPI transaction
 		if ((_mosi == 11 || _mosi == 7) && (_miso == 12 || _miso == 8) && (_sclk == 13 || _sclk == 14)) {//valid SPI pins?
 			if (_mosi != 11) SPI.setMOSI(_mosi);
