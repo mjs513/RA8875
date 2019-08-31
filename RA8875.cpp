@@ -66,7 +66,7 @@ Bit:	Called by:		In use:
 */
 /**************************************************************************/
 //------------------------------TEENSY 3/3.1 ---------------------------------------
-#if defined(__MK20DX128__) || defined(__MK20DX256__) || defined(__MK64FX512__) || defined(__MK66FX1M0__) || defined(__IMXRT1062__)
+#if defined(__MK20DX128__) || defined(__MK20DX256__) 
 	RA8875::RA8875(const uint8_t CSp,const uint8_t RSTp,const uint8_t mosi_pin,const uint8_t sclk_pin,const uint8_t miso_pin)
 	{
 		_mosi = mosi_pin;
@@ -93,6 +93,7 @@ Bit:	Called by:		In use:
 		_sclk = sclk_pin;
 		_cs = CSp;
 		_rst = RSTp;
+		_pspi = nullptr;
 //---------------------------------DUE--------------------------------------------
 #elif defined(___DUESTUFF)//DUE
 	RA8875::RA8875(const uint8_t CSp, const uint8_t RSTp) 
@@ -372,46 +373,51 @@ void RA8875::begin(const enum RA8875sizes s,uint8_t colors)
 			_errorCode |= (1 << 1);//set
 			return;
 		}
-		if (!SPI.pinIsChipSelect(_cs)) {
-			_errorCode |= (1 << 2);//set
-			return;
-		}
 		pinMode(_cs, OUTPUT);
 		SPI.begin();
 		digitalWrite(_cs, HIGH);
 	#elif defined(__MK64FX512__) || defined(__MK66FX1M0__)//future teensys
 		//always uses SPI transaction
-		if ((_mosi == 11 || _mosi == 7) && (_miso == 12 || _miso == 8) && (_sclk == 13 || _sclk == 14)) {//valid SPI pins?
+		//always uses SPI transaction 
+		if (SPI.pinIsMISO(_miso) && SPI.pinIsMOSI(_mosi) && SPI.pinIsSCK(_sclk)) {
+			_pspi = &SPI;
 			if (_mosi != 11) SPI.setMOSI(_mosi);
 			if (_miso != 12) SPI.setMISO(_miso);
 			if (_sclk != 13) SPI.setSCK(_sclk);
+			Serial.println("Use SPI");
+		} else if (SPI1.pinIsMISO(_miso) && SPI1.pinIsMOSI(_mosi) && SPI1.pinIsSCK(_sclk)) {
+			_pspi = &SPI1;
+			if (_mosi != 0)  SPI1.setMOSI(_mosi);
+			if (_miso != 1)  SPI1.setMISO(_miso);
+			if (_sclk != 32) SPI1.setSCK(_sclk);
+			Serial.println("Use SPI1");
+		} else if (SPI2.pinIsMISO(_miso) && SPI2.pinIsMOSI(_mosi) && SPI2.pinIsSCK(_sclk)) {
+			_pspi = &SPI2;
+			if (_mosi != 44)  SPI2.setMOSI(_mosi);
+			if (_miso != 45)  SPI2.setMISO(_miso);
+			if (_sclk != 46)  SPI2.setSCK(_sclk);
+			Serial.println("Use SPI2");
 		} else {
 			_errorCode |= (1 << 1);//set
 			return;
 		}
-		if (!SPI.pinIsChipSelect(_cs)) {
-			_errorCode |= (1 << 2);//set
-			return;
-		}
 		pinMode(_cs, OUTPUT);
-		SPI.begin();
+		_pspi->begin();
 		digitalWrite(_cs, HIGH);
 	#elif defined(__IMXRT1062__)
-		//always uses SPI transaction
-		if ((_mosi == 11 || _mosi == 26 || _mosi == 35) && (_miso == 12 || _miso == 1 || _miso == 34) && (_sclk == 13 || _sclk == 27 || _sclk == 36)) {//valid SPI pins?
-			if (_mosi != 11) SPI.setMOSI(_mosi);
-			if (_miso != 12) SPI.setMISO(_miso);
-			if (_sclk != 13) SPI.setSCK(_sclk);
+		//always uses SPI transaction 
+		if (SPI.pinIsMISO(_miso) && SPI.pinIsMOSI(_mosi) && SPI.pinIsSCK(_sclk)) {
+			_pspi = &SPI;
+		} else if (SPI1.pinIsMISO(_miso) && SPI1.pinIsMOSI(_mosi) && SPI1.pinIsSCK(_sclk)) {
+			_pspi = &SPI1;
+		} else if (SPI2.pinIsMISO(_miso) && SPI2.pinIsMOSI(_mosi) && SPI2.pinIsSCK(_sclk)) {
+			_pspi = &SPI2;
 		} else {
 			_errorCode |= (1 << 1);//set
 			return;
 		}
-		if (!SPI.pinIsChipSelect(_cs)) {
-			_errorCode |= (1 << 2);//set
-			return;
-		}
 		pinMode(_cs, OUTPUT);
-		SPI.begin();
+		_pspi->begin();
 		digitalWrite(_cs, HIGH);
 	#elif defined(__MKL26Z64__)//TeensyLC
 		//always uses SPI ransaction
@@ -590,6 +596,13 @@ void RA8875::begin(const enum RA8875sizes s,uint8_t colors)
 void RA8875::_initialize() 
 {
 	_inited = false;
+// HACK to setup SPI MODE 3
+/*	SPI.beginTransaction(SPISettings(_SPImaxSpeed, MSBFIRST, SPI_MODE3));
+	SPI.transfer(0);
+	SPI.endTransaction();
+	delay(1);
+*/
+
 	if (_rst == 255) {// soft reset time ?
 		writeCommand(RA8875_PWRR);
 		_writeData(RA8875_PWRR_SOFTRESET);
@@ -3346,6 +3359,8 @@ void RA8875::drawPixels(uint16_t p[], uint16_t count, int16_t x, int16_t y)
 			} else {
 				SPI.transfer(RA8875_DATAWRITE);
 			}
+		#elif defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__)	
+			_pspi->transfer(RA8875_DATAWRITE);
 		#else
 			SPI.transfer(RA8875_DATAWRITE);
 		#endif
@@ -3371,6 +3386,12 @@ void RA8875::drawPixels(uint16_t p[], uint16_t count, int16_t x, int16_t y)
 				} else {
 					SPI.transfer(temp & 0xFF);
 				}
+			}
+		#elif defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__)	
+			if (_color_bpp > 8){
+				_pspi->transfer16(temp);
+			} else {//TOTEST:layer bug workaround for 8bit color!
+				_pspi->transfer(temp & 0xFF);
 			}
 		#else
 			if (_color_bpp > 8){
@@ -3439,6 +3460,9 @@ uint16_t RA8875::getPixel(int16_t x, int16_t y)
 				SPI.transfer(RA8875_DATAREAD);
 				SPI.transfer(0x00);//first byte it's dummy
 			}
+		#elif defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__)	
+			_pspi->transfer(RA8875_DATAREAD);
+			_pspi->transfer(0x00);//first byte it's dummy
 		#else
 			SPI.transfer(RA8875_DATAREAD);
 			SPI.transfer(0x00);//first byte it's dummy
@@ -3451,6 +3475,8 @@ uint16_t RA8875::getPixel(int16_t x, int16_t y)
 			} else {
 				color  = SPI.transfer16(0x0);
 			}
+		#elif defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__)	
+			color  = _pspi->transfer16(0x0);
 		#else
 			color  = SPI.transfer16(0x0);
 		#endif
@@ -5731,6 +5757,9 @@ void RA8875::_writeData(uint8_t data)
 					SPI.transfer(RA8875_DATAWRITE);
 					SPI.transfer(data);
 				}
+			#elif defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__)	
+				_pspi->transfer(RA8875_DATAWRITE);
+				_pspi->transfer(data);
 			#else
 				SPI.transfer(RA8875_DATAWRITE);
 				SPI.transfer(data);
@@ -5759,6 +5788,8 @@ void  RA8875::writeData16(uint16_t data)
 			} else {
 				SPI.transfer(RA8875_DATAWRITE);
 			}
+		#elif defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__)	
+			_pspi->transfer(RA8875_DATAWRITE);
 		#else
 			SPI.transfer(RA8875_DATAWRITE);
 		#endif
@@ -5770,6 +5801,8 @@ void  RA8875::writeData16(uint16_t data)
 			} else {
 				SPI.transfer16(data);
 			}
+		#elif defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__)	
+			_pspi->transfer16(data);
 		#else
 			SPI.transfer16(data);
 		#endif
@@ -5823,6 +5856,9 @@ uint8_t RA8875::_readData(bool stat)
 					stat == true ? SPI.transfer(RA8875_CMDREAD) : SPI.transfer(RA8875_DATAREAD);
 					x = SPI.transfer(0x0);
 				}
+			#elif defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__)	
+				stat == true ? _pspi->transfer(RA8875_CMDREAD) : _pspi->transfer(RA8875_DATAREAD);
+				uint8_t x = _pspi->transfer(0x0);
 			#else
 				stat == true ? SPI.transfer(RA8875_CMDREAD) : SPI.transfer(RA8875_DATAREAD);
 				uint8_t x = SPI.transfer(0x0);
@@ -5879,6 +5915,9 @@ void RA8875::writeCommand(const uint8_t d)
 					SPI.transfer(RA8875_CMDWRITE);
 					SPI.transfer(d);
 				}
+			#elif defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__)	
+				_pspi->transfer(RA8875_CMDWRITE);
+				_pspi->transfer(d);
 			#else
 				SPI.transfer(RA8875_CMDWRITE);
 				SPI.transfer(d);
