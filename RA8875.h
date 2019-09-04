@@ -220,7 +220,7 @@ class RA8875 : public Print {
 	// void 		debugData(uint16_t data,uint8_t len=8);
 	// void 		showLineBuffer(uint8_t data[],int len);
 //------------- INSTANCE -------------------------------------------------------------------
-	#if defined(__MK20DX128__) || defined(__MK20DX256__) || defined(__MK64FX512__) || defined(__MK66FX1M0__) || defined(__IMXRT1062__)
+	#if defined(__MK20DX128__) || defined(__MK20DX256__)
 		RA8875(const uint8_t CSp,const uint8_t RSTp=255,const uint8_t mosi_pin=11,const uint8_t sclk_pin=13,const uint8_t miso_pin=12);
 	#elif defined(__MKL26Z64__)//TeensyLC
 		RA8875(const uint8_t CSp,const uint8_t RSTp=255,const uint8_t mosi_pin=11,const uint8_t sclk_pin=13,const uint8_t miso_pin=12);
@@ -481,6 +481,9 @@ using Print::write;
 	#if defined(TEENSYDUINO)//all of them (32 bit only)
 		uint8_t 				  _cs;
 		uint8_t 				  _miso, _mosi, _sclk;
+	  #if defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__)	
+		SPIClass				*_pspi;	// which SPI are we using...
+      #endif
 	#elif defined(ENERGIA)
 		uint8_t _cs;
 	#else
@@ -641,7 +644,8 @@ using Print::write;
 	//inline __attribute__((always_inline))
 	uint8_t _color16To8bpp(uint16_t color) 
 		__attribute__((always_inline)) {
-		return (map((color & 0xF800) >> 11, 0,28, 0,7)<<5 | map((color & 0x07E0) >> 5, 0,56, 0,7)<<2 | map(color & 0x001F, 0,24, 0,3));
+ 		return ((color & 0xe000) >> 8) | ((color & 0x700) >> 6) | ((color & 0x18) >> 3);
+//		return (map((color & 0xF800) >> 11, 0,28, 0,7)<<5 | map((color & 0x07E0) >> 5, 0,56, 0,7)<<2 | map(color & 0x001F, 0,24, 0,3));
 	}
 		
 	//inline __attribute__((always_inline)) 
@@ -692,6 +696,8 @@ using Print::write;
 		#if defined(SPI_HAS_TRANSACTION)
 			#if defined(__MKL26Z64__)	
 				_altSPI == true ? SPI1.beginTransaction(SPISettings(_SPImaxSpeed, MSBFIRST, SPI_MODE3)) : SPI.beginTransaction(SPISettings(_SPImaxSpeed, MSBFIRST, SPI_MODE3));
+			#elif defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__)	
+				_pspi->beginTransaction(SPISettings(_SPImaxSpeed, MSBFIRST, SPI_MODE3));
 			#elif defined(ESP8266)	
 				SPI.beginTransaction(SPISettings(_SPImaxSpeed, MSBFIRST, SPI_MODE3));//it works, anyway ESP doesn't work in MODE3!
 			#elif defined(SPARK)	
@@ -758,6 +764,8 @@ using Print::write;
 	#if defined(SPI_HAS_TRANSACTION)
 		#if defined(__MKL26Z64__)	
 			_altSPI == true ? SPI1.endTransaction() : SPI.endTransaction();
+		#elif defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__)	
+			_pspi->endTransaction();
 		#else
 			SPI.endTransaction();
 		#endif

@@ -13,21 +13,42 @@ example of drawLineAngle
 
 RA8875 tft = RA8875(RA8875_CS, RA8875_RESET);
 
+uint16_t x1, x2, x3, y;
+
 void setup()
 {
 
   tft.begin(RA8875_800x480);
 
+  x1 = tft.width() / 2;
+  x2 = tft.width() / 2 + 200;
+  x3 = tft.width() / 2 - 200;
+  y = tft.height() / 2;
+  
+  tft.drawCircle(x1, y, 100, 0xFFFF);//draw round gauge
 
-  tft.drawCircle(tft.width() / 2, tft.height() / 2, 101, 0xFFFF);//draw round gauge
-  tft.drawCircle(tft.width() / 2, tft.height() / 2, 103, 0xFFFF);//draw round gauge
+  tft.drawCircle(x2, y, 100, 0xFFFF);
+  tft.drawCircle(x2, y, 33, 0xFFFF);
+
+  tft.drawCircle(x3, y, 100, 0xFFFF);
+  tft.drawCircle(x3, y, 50, 0xFFFF);
 }
 
 void loop()
 {
-  for (int i = 0; i <= 360; i++) {
-    if (i > 0) tft.drawLineAngle(tft.width() / 2, tft.height() / 2, i - 1, 100, 0x0000);//erase previous needle
-    tft.drawLineAngle(tft.width() / 2, tft.height() / 2, i, 100, 0xFFFF);//draw needle
+  for (uint16_t i = 0; i < 360; i++) {
+    //erase previous
+    tft.drawLineAngle(x1, y, -i + 1, 100, 0x0000, 0);//erase previous needle
+    tft.drawLineAngle(x2, y, i*2 - 2, 34, 66, 0x0000, 180);
+    tft.drawLineAngle(x3, y, i - 1, 75, 1, 0x0000, 180);
+    tft.drawLineAngle(x3, y, i - 1, 75, 1, 0x0000, 60);
+    tft.drawLineAngle(x3, y, i - 1, 75, 1, 0x0000, 300);
+    //draw
+    tft.drawLineAngle(x1, y, -i, 100, 0xFFFF, 0);//draw needle from center, if offset is not passed, it will default to -90.0
+    tft.drawLineAngle(x2, y, i*2, 34, 66, 0xFFFF, 180);//draw needle some distance from center
+    tft.drawLineAngle(x3, y, i, 75, 1, 0xFFFF, 180);//draw pixel some distance from center
+    tft.drawLineAngle(x3, y, i, 75, 1, 0xFFFF, 60);
+    tft.drawLineAngle(x3, y, i, 75, 1, 0xFFFF, 300);
     delay(10);
   }
 }
