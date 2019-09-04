@@ -3613,8 +3613,11 @@ void RA8875::drawLineAngle(int16_t x, int16_t y, int16_t angle, uint16_t length,
 /**************************************************************************/
 void RA8875::drawLineAngle(int16_t x, int16_t y, int16_t angle, uint16_t start, uint16_t length, uint16_t color,int offset)
 {
-	if (start - length < 2) {//NEW
-		drawPixel(x,y,color);
+	if (length < 2) {
+		drawPixel(
+		x + round(start * _cosDeg_helper(angle + offset)),
+		y + round(start * _sinDeg_helper(angle + offset)),
+		color);
 	} else {
 		length--;//n
 		drawLine(
