@@ -203,12 +203,6 @@ template <typename T> T PROGMEM_read (const T * sce)
 
 
 
-#if defined(__MKL26Z64__)
-	static bool _altSPI;
-#endif
-#ifdef SPI_HAS_TRANSACTION
-	static volatile uint32_t _SPImaxSpeed;//holder for SPI speed
-#endif
 
 #if defined(ESP8266) && defined(_FASTSSPORT)
 	#include <eagle_soc.h>
@@ -236,7 +230,7 @@ class RA8875 : public Print {
 		RA8875(const uint8_t CSp, const uint8_t RSTp=255);
 	#endif
 //------------- SETUP -----------------------------------------------------------------------
-	void 		begin(const enum RA8875sizes s,uint8_t colors=16);
+	void 		begin(const enum RA8875sizes s,uint8_t colors=16, uint32_t SPIMaxSpeed = (uint32_t)-1 );
 	//(RA8875_480x272, RA8875_800x480, Adafruit_480x272, Adafruit_800x480) , (8/16 bit)
 //------------- HARDWARE ------------------------------------------------------------
 	void 		backlight(boolean on);
@@ -478,10 +472,14 @@ using Print::write;
 	#endif
 
 	
+	#ifdef SPI_HAS_TRANSACTION
+	volatile uint32_t 			_SPITransactionSpeed; //holder for SPI speed
+	uint32_t					_SPIMaxSpeed;         // Max Speed defined in either begin or presets...
+	#endif
 	#if defined(TEENSYDUINO)//all of them (32 bit only)
 		uint8_t 				  _cs;
 		uint8_t 				  _miso, _mosi, _sclk;
-	  #if defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__)	
+	  #if defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__) || defined(__MKL26Z64__)
 		SPIClass				*_pspi;	// which SPI are we using...
       #endif
 	#elif defined(ENERGIA)
@@ -694,18 +692,16 @@ using Print::write;
 	void _startSend()
 		__attribute__((always_inline)) {
 		#if defined(SPI_HAS_TRANSACTION)
-			#if defined(__MKL26Z64__)	
-				_altSPI == true ? SPI1.beginTransaction(SPISettings(_SPImaxSpeed, MSBFIRST, SPI_MODE3)) : SPI.beginTransaction(SPISettings(_SPImaxSpeed, MSBFIRST, SPI_MODE3));
-			#elif defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__)	
-				_pspi->beginTransaction(SPISettings(_SPImaxSpeed, MSBFIRST, SPI_MODE3));
+			#if defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__) || defined(__MKL26Z64__)
+				_pspi->beginTransaction(SPISettings(_SPITransactionSpeed, MSBFIRST, SPI_MODE3));
 			#elif defined(ESP8266)	
-				SPI.beginTransaction(SPISettings(_SPImaxSpeed, MSBFIRST, SPI_MODE3));//it works, anyway ESP doesn't work in MODE3!
+				SPI.beginTransaction(SPISettings(_SPITransactionSpeed, MSBFIRST, SPI_MODE3));//it works, anyway ESP doesn't work in MODE3!
 			#elif defined(SPARK)	
-				SPI.beginTransaction(SPISettings(_SPImaxSpeed, MSBFIRST, SPI_MODE0));//TODO !
+				SPI.beginTransaction(SPISettings(_SPITransactionSpeed, MSBFIRST, SPI_MODE0));//TODO !
 			#else
-				SPI.beginTransaction(SPISettings(_SPImaxSpeed, MSBFIRST, SPI_MODE3));
+				SPI.beginTransaction(SPISettings(_SPITransactionSpeed, MSBFIRST, SPI_MODE3));
 			#endif
-		#elif !defined(ENERGIA) && !defined(SPI_HAS_TRANSACTION) && !defined(___STM32STUFF) && !defined(ESP8266) && !defined(SPARK)
+		#elif !defined(ENERGIA) && !defined(_SPITransactionSpeed) && !defined(___STM32STUFF) && !defined(ESP8266) && !defined(SPARK)
 			cli();//protect from interrupts
 		#endif//end has transaction
 		
@@ -762,9 +758,7 @@ using Print::write;
 	#endif
 	
 	#if defined(SPI_HAS_TRANSACTION)
-		#if defined(__MKL26Z64__)	
-			_altSPI == true ? SPI1.endTransaction() : SPI.endTransaction();
-		#elif defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__)	
+		#if defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__) || defined(__MKL26Z64__)
 			_pspi->endTransaction();
 		#else
 			SPI.endTransaction();
@@ -790,17 +784,9 @@ void _slowDownSPI(bool slow,uint32_t slowSpeed=10000000UL)
 	__attribute__((always_inline)) {
 	#if defined(SPI_HAS_TRANSACTION)
 		if (slow){
-			_SPImaxSpeed = slowSpeed;
+			_SPITransactionSpeed = slowSpeed;
 		} else {
-			#if defined(__MKL26Z64__)	
-				if (_altSPI){
-					_SPImaxSpeed = MAXSPISPEED2;//TeensyLC max SPI speed on alternate SPI
-				} else {
-					_SPImaxSpeed = MAXSPISPEED;
-				}
-			#else
-				_SPImaxSpeed = MAXSPISPEED;
-			#endif
+			_SPITransactionSpeed = _SPIMaxSpeed;
 		}
 	#else
 		if (slow){

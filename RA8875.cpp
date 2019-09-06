@@ -83,7 +83,7 @@ Bit:	Called by:		In use:
 		_sclk = sclk_pin;
 		_cs = CSp;
 		_rst = RSTp;
-		_altSPI = false;
+		_pspi = nullptr;
 //------------------------------Teensy of the future -------------------------------------------
 #elif defined(__MK64FX512__) || defined(__MK66FX1M0__) || defined(__IMXRT1062__)
 	RA8875::RA8875(const uint8_t CSp,const uint8_t RSTp,const uint8_t mosi_pin,const uint8_t sclk_pin,const uint8_t miso_pin)
@@ -167,7 +167,7 @@ void RA8875::selectCS(uint8_t module)
 	module: sets the SPI interface (it depends from MCU). Default:0
 */
 /**************************************************************************/
-void RA8875::begin(const enum RA8875sizes s,uint8_t colors) 
+void RA8875::begin(const enum RA8875sizes s,uint8_t colors, uint32_t SPIMaxSpeed ) 
 {
 	_errorCode = 0;
 	_displaySize = s;
@@ -180,6 +180,9 @@ void RA8875::begin(const enum RA8875sizes s,uint8_t colors)
 	_intNum = 0;
 	_useISR = false;
 	_enabledInterrups = 0b00000000;
+	#if defined(SPI_HAS_TRANSACTION)
+	_SPIMaxSpeed = SPIMaxSpeed;	
+	#endif
 	/* used to understand wat causes an INT
 	bit
 	0:
@@ -384,19 +387,19 @@ void RA8875::begin(const enum RA8875sizes s,uint8_t colors)
 			if (_mosi != 11) SPI.setMOSI(_mosi);
 			if (_miso != 12) SPI.setMISO(_miso);
 			if (_sclk != 13) SPI.setSCK(_sclk);
-			Serial.println("Use SPI");
+			//Serial.println("Use SPI");
 		} else if (SPI1.pinIsMISO(_miso) && SPI1.pinIsMOSI(_mosi) && SPI1.pinIsSCK(_sclk)) {
 			_pspi = &SPI1;
 			if (_mosi != 0)  SPI1.setMOSI(_mosi);
 			if (_miso != 1)  SPI1.setMISO(_miso);
 			if (_sclk != 32) SPI1.setSCK(_sclk);
-			Serial.println("Use SPI1");
+			//Serial.println("Use SPI1");
 		} else if (SPI2.pinIsMISO(_miso) && SPI2.pinIsMOSI(_mosi) && SPI2.pinIsSCK(_sclk)) {
 			_pspi = &SPI2;
 			if (_mosi != 44)  SPI2.setMOSI(_mosi);
 			if (_miso != 45)  SPI2.setMISO(_miso);
 			if (_sclk != 46)  SPI2.setSCK(_sclk);
-			Serial.println("Use SPI2");
+			//Serial.println("Use SPI2");
 		} else {
 			_errorCode |= (1 << 1);//set
 			return;
@@ -422,37 +425,28 @@ void RA8875::begin(const enum RA8875sizes s,uint8_t colors)
 	#elif defined(__MKL26Z64__)//TeensyLC
 		//always uses SPI ransaction
 		#if TEENSYDUINO > 121//not supported prior 1.22!
-			if ((_mosi == 11 || _mosi == 7 || _mosi == 0 || _mosi == 21) && (_miso == 12 || _miso == 8 || _miso == 1 || _miso == 5) && (_sclk == 13 || _sclk == 14 || _sclk == 20)) {//valid SPI pins?
-				if ((_mosi == 0 || _mosi == 21) && (_miso == 1 || _miso == 5) && (_sclk == 20)) {//identify alternate SPI channel 1 (24Mhz)
-					_altSPI = true;
-					if (_cs != 6){//on SPI1 cs should be only 6!
-						_errorCode |= (1 << 2);//set
-						return;
-					}
-					if (_mosi != 11) SPI1.setMOSI(_mosi);
-					if (_miso != 12) SPI1.setMISO(_miso);
-					if (_sclk != 13) SPI1.setSCK(_sclk);
-					pinMode(_cs, OUTPUT);
-					SPI1.begin();
-				} else {//default SPI channel 0 (12Mhz)
-					_altSPI = false;
-					if (_mosi != 11) SPI.setMOSI(_mosi);
-					if (_miso != 12) SPI.setMISO(_miso);
-					if (_sclk != 13) SPI.setSCK(_sclk);
-					if (!SPI.pinIsChipSelect(_cs)) {//ERROR
-						_errorCode |= (1 << 2);//set
-						return;
-					}
-					pinMode(_cs, OUTPUT);
-					SPI.begin();
-					digitalWrite(_cs, HIGH);
-				}
-			} else {
-				_errorCode |= (1 << 1);//set
-				return;
-			}
+
+		if (SPI.pinIsMISO(_miso) && SPI.pinIsMOSI(_mosi) && SPI.pinIsSCK(_sclk)) {
+			_pspi = &SPI;
+			if (_mosi != 11) SPI.setMOSI(_mosi);
+			if (_miso != 12) SPI.setMISO(_miso);
+			if (_sclk != 13) SPI.setSCK(_sclk);
+			//Serial.println("Use SPI");
+		} else if (SPI1.pinIsMISO(_miso) && SPI1.pinIsMOSI(_mosi) && SPI1.pinIsSCK(_sclk)) {
+			_pspi = &SPI1;
+			if (_mosi != 0)  SPI1.setMOSI(_mosi);
+			if (_miso != 1)  SPI1.setMISO(_miso);
+			if (_sclk != 20) SPI1.setSCK(_sclk);
+			//Serial.println("Use SPI1");
+		} else {
+			_errorCode |= (1 << 1);//set
+			return;
+		}
+		pinMode(_cs, OUTPUT);
+		_pspi->begin();
+		digitalWrite(_cs, HIGH);
 		#else
-			_altSPI = false;
+			_pspi = &SPI;
 			pinMode(_cs, OUTPUT);
 			SPI.begin();
 			digitalWrite(_cs, HIGH);
@@ -517,7 +511,7 @@ void RA8875::begin(const enum RA8875sizes s,uint8_t colors)
 
 	//set SPI SPEED, starting at low speed, after init will raise up!
 	#if defined(SPI_HAS_TRANSACTION)
-		_SPImaxSpeed = 4000000UL;//we start in low speed here!
+		_SPITransactionSpeed = 4000000UL;//we start in low speed here!
 	#else//do not use SPItransactons
 		#if defined (__AVR__)//8 bit arduino's
 			pinMode(_cs, OUTPUT);
@@ -597,7 +591,7 @@ void RA8875::_initialize()
 {
 	_inited = false;
 // HACK to setup SPI MODE 3
-/*	SPI.beginTransaction(SPISettings(_SPImaxSpeed, MSBFIRST, SPI_MODE3));
+/*	SPI.beginTransaction(SPISettings(_SPIMaxSpeed, MSBFIRST, SPI_MODE3));
 	SPI.transfer(0);
 	SPI.endTransaction();
 	delay(1);
@@ -644,19 +638,21 @@ void RA8875::_initialize()
 	_setSysClock(sysClockPar[_initIndex][0],sysClockPar[_initIndex][1],initStrings[_initIndex][2]);
 	_inited = true;
 	//from here we will go at high speed!
+	#if defined(SPI_HAS_TRANSACTION)
+    if (_SPIMaxSpeed == (uint32_t)-1) {
+		#if defined(__MKL26Z64__)
+		_SPIMaxSpeed = (_pspi != &SPI)? MAXSPISPEED2 : MAXSPISPEED;
+		#else			
+			_SPIMaxSpeed = MAXSPISPEED;
+		#endif
+	}
+	_SPITransactionSpeed = _SPIMaxSpeed;
+	//Serial.printf("SPI Transaction speed: %d Max Speed:%d\n", _SPITransactionSpeed, _SPIMaxSpeed);
+	#endif
 	#if defined(_FASTCPU)
 		_slowDownSPI(false);
 	#else
 		#if defined(SPI_HAS_TRANSACTION)
-			#if defined(__MKL26Z64__)
-				if (_altSPI){
-					_SPImaxSpeed = MAXSPISPEED2;
-				} else {
-					_SPImaxSpeed = MAXSPISPEED;
-				}
-			#else			
-				_SPImaxSpeed = MAXSPISPEED;
-			#endif
 		#else
 			#if defined(___DUESTUFF) && defined(SPI_DUE_MODE_EXTENDED)
 				SPI.setClockDivider(_cs,SPI_SPEED_WRITE);
@@ -3353,13 +3349,7 @@ void RA8875::drawPixels(uint16_t p[], uint16_t count, int16_t x, int16_t y)
 	#if (defined(__AVR__) && defined(_FASTSSPORT)) || defined(SPARK)
 		_spiwrite(RA8875_DATAWRITE);
 	#else
-		#if defined(SPI_HAS_TRANSACTION) && defined(__MKL26Z64__)	
-			if (_altSPI){
-				SPI1.transfer(RA8875_DATAWRITE);
-			} else {
-				SPI.transfer(RA8875_DATAWRITE);
-			}
-		#elif defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__)	
+		#if defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__) || defined(__MKL26Z64__)
 			_pspi->transfer(RA8875_DATAWRITE);
 		#else
 			SPI.transfer(RA8875_DATAWRITE);
@@ -3373,21 +3363,7 @@ void RA8875::drawPixels(uint16_t p[], uint16_t count, int16_t x, int16_t y)
 			temp = p[i];
 		}
 	#if !defined(ENERGIA) && !defined(___DUESTUFF) && ((ARDUINO >= 160) || (TEENSYDUINO > 121))
-		#if defined(SPI_HAS_TRANSACTION) && defined(__MKL26Z64__)	
-			if (_color_bpp > 8){
-				if (_altSPI){
-					SPI1.transfer16(temp);
-				} else {
-					SPI.transfer16(temp);
-				}
-			} else {//TOTEST:layer bug workaround for 8bit color!
-				if (_altSPI){
-					SPI1.transfer(temp);
-				} else {
-					SPI.transfer(temp & 0xFF);
-				}
-			}
-		#elif defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__)	
+		#if defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__) || defined(__MKL26Z64__)
 			if (_color_bpp > 8){
 				_pspi->transfer16(temp);
 			} else {//TOTEST:layer bug workaround for 8bit color!
@@ -3452,15 +3428,7 @@ uint16_t RA8875::getPixel(int16_t x, int16_t y)
 		_spiwrite(RA8875_DATAREAD);
 		_spiwrite(0x00);
 	#else
-		#if defined(SPI_HAS_TRANSACTION) && defined(__MKL26Z64__)	
-			if (_altSPI){
-				SPI1.transfer(RA8875_DATAREAD);
-				SPI1.transfer(0x00);//first byte it's dummy
-			} else {
-				SPI.transfer(RA8875_DATAREAD);
-				SPI.transfer(0x00);//first byte it's dummy
-			}
-		#elif defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__)	
+		#if defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__) || defined(__MKL26Z64__)
 			_pspi->transfer(RA8875_DATAREAD);
 			_pspi->transfer(0x00);//first byte it's dummy
 		#else
@@ -3469,13 +3437,7 @@ uint16_t RA8875::getPixel(int16_t x, int16_t y)
 		#endif
 	#endif
 	#if !defined(___DUESTUFF) && ((ARDUINO >= 160) || (TEENSYDUINO > 121))
-		#if defined(SPI_HAS_TRANSACTION) && defined(__MKL26Z64__)	
-			if (_altSPI){
-				color  = SPI1.transfer16(0x0);
-			} else {
-				color  = SPI.transfer16(0x0);
-			}
-		#elif defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__)	
+		#if defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__) || defined(__MKL26Z64__)
 			color  = _pspi->transfer16(0x0);
 		#else
 			color  = SPI.transfer16(0x0);
@@ -5644,7 +5606,7 @@ void RA8875::sleep(boolean sleep)
 				_slowDownSPI(true);
 			#else
 				#if defined(SPI_HAS_TRANSACTION)
-					_SPImaxSpeed = 4000000UL;
+					_SPITransactionSpeed = 4000000UL;
 				#else
 					#if defined(___DUESTUFF) && defined(SPI_DUE_MODE_EXTENDED)
 						SPI.setClockDivider(_cs,SPI_SPEED_READ);
@@ -5673,15 +5635,7 @@ void RA8875::sleep(boolean sleep)
 				_slowDownSPI(false);
 			#else
 				#if defined(SPI_HAS_TRANSACTION)
-					#if defined(__MKL26Z64__)
-						if (_altSPI){
-							_SPImaxSpeed = MAXSPISPEED2;
-						} else {
-							_SPImaxSpeed = MAXSPISPEED;
-						}
-					#else			
-						_SPImaxSpeed = MAXSPISPEED;
-					#endif
+						_SPITransactionSpeed = _SPIMaxSpeed;
 				#else
 					#if defined(___DUESTUFF) && defined(SPI_DUE_MODE_EXTENDED)
 						SPI.setClockDivider(_cs,SPI_SPEED_WRITE);
@@ -5752,15 +5706,7 @@ void RA8875::_writeData(uint8_t data)
 			_spiwrite(RA8875_DATAWRITE);
 			_spiwrite(data);
 		#else
-			#if defined(__MKL26Z64__)	
-				if (_altSPI){
-					SPI1.transfer(RA8875_DATAWRITE);
-					SPI1.transfer(data);
-				} else {
-					SPI.transfer(RA8875_DATAWRITE);
-					SPI.transfer(data);
-				}
-			#elif defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__)	
+			#if defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__) || defined(__MKL26Z64__)
 				_pspi->transfer(RA8875_DATAWRITE);
 				_pspi->transfer(data);
 			#else
@@ -5785,26 +5731,14 @@ void  RA8875::writeData16(uint16_t data)
 	#if (defined(__AVR__) && defined(_FASTSSPORT)) || defined(SPARK)
 		_spiwrite(RA8875_DATAWRITE);
 	#else
-		#if defined(__MKL26Z64__)	
-			if (_altSPI){
-				SPI1.transfer(RA8875_DATAWRITE);
-			} else {
-				SPI.transfer(RA8875_DATAWRITE);
-			}
-		#elif defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__)	
+		#if defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__) || defined(__MKL26Z64__)
 			_pspi->transfer(RA8875_DATAWRITE);
 		#else
 			SPI.transfer(RA8875_DATAWRITE);
 		#endif
 	#endif
 	#if !defined(ENERGIA) && !defined(___DUESTUFF) && ((ARDUINO >= 160) || (TEENSYDUINO > 121))
-		#if defined(__MKL26Z64__)	
-			if (_altSPI){
-				SPI1.transfer16(data);
-			} else {
-				SPI.transfer16(data);
-			}
-		#elif defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__)	
+		#if defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__) || defined(__MKL26Z64__)
 			_pspi->transfer16(data);
 		#else
 			SPI.transfer16(data);
@@ -5833,7 +5767,7 @@ void  RA8875::writeData16(uint16_t data)
 uint8_t RA8875::_readData(bool stat) 
 {
 	#if defined(SPI_HAS_TRANSACTION)
-		if (_inited) _SPImaxSpeed = _SPImaxSpeed/2;
+		if (_inited) _SPITransactionSpeed = _SPIMaxSpeed / 2;
 	#else
 		#if defined(___DUESTUFF) && defined(SPI_DUE_MODE_EXTENDED)
 			if (_inited) SPI.setClockDivider(_cs,SPI_SPEED_READ);
@@ -5850,16 +5784,7 @@ uint8_t RA8875::_readData(bool stat)
 			stat == true ? _spiwrite(RA8875_CMDREAD) : _spiwrite(RA8875_DATAREAD);
 			uint8_t x = _spiread();
 		#else
-			#if defined(__MKL26Z64__)	
-				uint8_t x;
-				if (_altSPI){
-					stat == true ? SPI1.transfer(RA8875_CMDREAD) : SPI1.transfer(RA8875_DATAREAD);
-					x = SPI1.transfer(0x0);
-				} else {
-					stat == true ? SPI.transfer(RA8875_CMDREAD) : SPI.transfer(RA8875_DATAREAD);
-					x = SPI.transfer(0x0);
-				}
-			#elif defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__)	
+			#if defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__) || defined(__MKL26Z64__)
 				stat == true ? _pspi->transfer(RA8875_CMDREAD) : _pspi->transfer(RA8875_DATAREAD);
 				uint8_t x = _pspi->transfer(0x0);
 			#else
@@ -5870,7 +5795,7 @@ uint8_t RA8875::_readData(bool stat)
 	#endif
 	_endSend();
 	#if defined(SPI_HAS_TRANSACTION)
-		if (_inited) _SPImaxSpeed = _SPImaxSpeed*2;
+		if (_inited) _SPITransactionSpeed = _SPIMaxSpeed;
 	#else
 		#if defined(___DUESTUFF) && defined(SPI_DUE_MODE_EXTENDED)
 			if (_inited) SPI.setClockDivider(_cs,SPI_SPEED_WRITE);
@@ -5910,15 +5835,7 @@ void RA8875::writeCommand(const uint8_t d)
 			_spiwrite(RA8875_CMDWRITE);
 			_spiwrite(d);
 		#else
-			#if defined(SPI_HAS_TRANSACTION) && defined(__MKL26Z64__)	
-				if (_altSPI){
-					SPI1.transfer(RA8875_CMDWRITE);
-					SPI1.transfer(d);
-				} else {
-					SPI.transfer(RA8875_CMDWRITE);
-					SPI.transfer(d);
-				}
-			#elif defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__)	
+			#if defined(__MK64FX512__) || defined(__MK66FX1M0__)  || defined(__IMXRT1062__) || defined(__MKL26Z64__)
 				_pspi->transfer(RA8875_CMDWRITE);
 				_pspi->transfer(d);
 			#else
