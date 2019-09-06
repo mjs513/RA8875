@@ -15,6 +15,7 @@ RA8875 tft = RA8875(RA8875_CS,RA8875_RESET);
 void setup()
 {
 
+  //  begin display: Choose from: RA8875_480x272, RA8875_800x480, RA8875_800x480ALT, Adafruit_480x272, Adafruit_800x480
   tft.begin(RA8875_800x480);
 
 }

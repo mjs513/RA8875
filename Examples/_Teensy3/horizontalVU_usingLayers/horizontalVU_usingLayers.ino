@@ -60,6 +60,7 @@ void setup()
   //while (!Serial) {;}
   Serial.println("RA8875 start");
 
+  //  begin display: Choose from: RA8875_480x272, RA8875_800x480, RA8875_800x480ALT, Adafruit_480x272, Adafruit_800x480
   tft.begin(RA8875_800x480);
 
   tft.writeTo(L1);//write colored bars to layer 1

@@ -30,6 +30,7 @@ void setup()
   while (!Serial && ((millis () - debug_start) <= 400)) ;
   Serial.println("RA8875 start");
 
+  //  begin display: Choose from: RA8875_480x272, RA8875_800x480, RA8875_800x480ALT, Adafruit_480x272, Adafruit_800x480
   tft.begin(RA8875_800x480);
   
   //tft.setRotation(0);

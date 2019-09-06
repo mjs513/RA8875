@@ -173,6 +173,7 @@ void setup()
 {
 
   uint8_t i;
+  //  begin display: Choose from: RA8875_480x272, RA8875_800x480, RA8875_800x480ALT, Adafruit_480x272, Adafruit_800x480
   tft.begin(RA8875_800x480);
   //upload chars in address 0x00 to 0x04
   tft.uploadUserChar(battery1, 0); //0x00

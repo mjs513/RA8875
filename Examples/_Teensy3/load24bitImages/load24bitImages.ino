@@ -58,6 +58,7 @@ void setup()
   //while (!Serial && ((millis () - debug_start) <= 5000)) ;
   Serial.println("RA8875 start");
 
+  //  begin display: Choose from: RA8875_480x272, RA8875_800x480, RA8875_800x480ALT, Adafruit_480x272, Adafruit_800x480
   tft.begin(RA8875_800x480);
   drawArray(image_data_alerts,18216,184,tft.width()/2-184/2,tft.height()/2-99/2);
 }

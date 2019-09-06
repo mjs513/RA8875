@@ -15,6 +15,7 @@ void setup() {
   Serial.begin(38400);
   long unsigned debug_start = millis ();
   while (!Serial && ((millis () - debug_start) <= 5000)) ;
+  //  begin display: Choose from: RA8875_480x272, RA8875_800x480, RA8875_800x480ALT, Adafruit_480x272, Adafruit_800x480
   tft.begin(RA8875_800x480);
   Serial.println(F("Turn ON layers (automatically)"));
   tft.writeTo(L1);//If layers off it will turn on

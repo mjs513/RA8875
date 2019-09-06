@@ -28,6 +28,7 @@ volatile int16_t gaugeVal2[2] = {0, -1};
 volatile int16_t gaugeVal3[2] = {0, -1};
 
 void setup() {
+  //  begin display: Choose from: RA8875_480x272, RA8875_800x480, RA8875_800x480ALT, Adafruit_480x272, Adafruit_800x480
   tft.begin(RA8875_800x480);
   tft.brightness(160);
   drawGauge(gaugePos1, gaugeLimits1);

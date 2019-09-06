@@ -18,6 +18,7 @@ uint16_t x1, x2, x3, y;
 void setup()
 {
 
+  //  begin display: Choose from: RA8875_480x272, RA8875_800x480, RA8875_800x480ALT, Adafruit_480x272, Adafruit_800x480
   tft.begin(RA8875_800x480);
 
   x1 = tft.width() / 2;

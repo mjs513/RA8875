@@ -55,6 +55,7 @@ static uint8_t conv2d(const char* p) {
 }
 
 void setup(void) {
+  //  begin display: Choose from: RA8875_480x272, RA8875_800x480, RA8875_800x480ALT, Adafruit_480x272, Adafruit_800x480
   tft.begin(RA8875_800x480);
 
   tft.setTextColor(RA8875_WHITE, RA8875_BLACK);
