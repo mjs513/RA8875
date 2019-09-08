@@ -5513,16 +5513,13 @@ void RA8875::touchReadAdc(uint16_t *x, uint16_t *y)
 {
 	uint16_t tx,ty;
 	readTouchADC(&tx,&ty);
-	#if (defined(TOUCSRCAL_XLOW) && (TOUCSRCAL_XLOW != 0)) || (defined(TOUCSRCAL_XHIGH) && (TOUCSRCAL_XHIGH != 0))
+	if (_calibrated) {
 		*x = map(tx,_tsAdcMinX,_tsAdcMaxX,0,1024);
-	#else
-		*x = tx;
-	#endif
-	#if (defined(TOUCSRCAL_YLOW) && (TOUCSRCAL_YLOW != 0)) || (defined(TOUCSRCAL_YHIGH) && (TOUCSRCAL_YHIGH != 0))
 		*y = map(ty,_tsAdcMinY,_tsAdcMaxY,0,1024);
-	#else
+	} else {
+		*x = tx;
 		*y = ty;
-	#endif
+	}
 	_checkInterrupt(2);
 }
 
@@ -5594,7 +5591,7 @@ void RA8875::setTouchCalibrationData(uint16_t minX, uint16_t maxX, uint16_t minY
 	_touchrcal_yhigh = maxY;
 
 	// Lets guess at setting is calibrated. 
-	_calibrated = ((minX >= maxX) || (minY >= maxY)) ? false : true;
+	_calibrated = (minX || maxX) && (minY || maxY);
 	setRotation(_rotation);	 // make sure it is updated to what ever the rotation is now.
 }
 
