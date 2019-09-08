@@ -394,6 +394,7 @@ class RA8875 : public Print {
 	bool 		touched(bool safe=false);
 	void 		setTouchLimit(uint8_t limit);//5 for FT5206, 1 for  RA8875
 	uint8_t 	getTouchLimit(void);
+
 #	if defined(USE_RA8875_TOUCH)
 		//void		useINT(const uint8_t INTpin=2,const uint8_t INTnum=0);
 		//void 		enableISR(bool force = false); 
@@ -402,6 +403,7 @@ class RA8875 : public Print {
 		void 		touchReadAdc(uint16_t *x, uint16_t *y);//returns 10bit ADC data (0...1024)
 		void 		touchReadPixel(uint16_t *x, uint16_t *y);//return pixels (0...width, 0...height)
 		boolean		touchCalibrated(void);//true if screen calibration it's present
+		void		setTouchCalibrationData(uint16_t minX, uint16_t maxX, uint16_t minY, uint16_t maxY);
 	#elif defined (USE_FT5206_TOUCH)
 		void		useCapINT(const uint8_t INTpin=2,const uint8_t INTnum=0);
 		void 		enableCapISR(bool force = false); 
@@ -534,6 +536,7 @@ using Print::write;
 			void 					_disableCapISR(void);
 		#elif defined(USE_RA8875_TOUCH)//RA8875 internal resistive specifics
 			uint16_t 				_tsAdcMinX,_tsAdcMinY,_tsAdcMaxX,_tsAdcMaxY;
+			uint16_t 				_touchrcal_xlow,_touchrcal_ylow,_touchrcal_xhigh,_touchrcal_yhigh;
 			void					readTouchADC(uint16_t *x, uint16_t *y);
 			bool					_calibrated;
 			boolean					_isCalibrated(void);//true if screen calibration it's present

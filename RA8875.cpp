@@ -282,6 +282,7 @@ void RA8875::begin(const enum RA8875sizes s,uint8_t colors, uint32_t SPIMaxSpeed
 		_clearTInt = false;
 		_touchEnabled = false;
 		#if defined(USE_RA8875_TOUCH)//resistive touch
+			_touchrcal_xlow = TOUCSRCAL_XLOW; _touchrcal_ylow = TOUCSRCAL_YLOW; _touchrcal_xhigh = TOUCSRCAL_XHIGH; _touchrcal_yhigh = TOUCSRCAL_YHIGH;
 			_calibrated = _isCalibrated();//check calibration at startup
 			if (!_calibrated) {
 				_tsAdcMinX = 0; _tsAdcMinY = 0; _tsAdcMaxX = 1023; _tsAdcMaxY = 1023;
@@ -1005,7 +1006,7 @@ void RA8875::setRotation(uint8_t rotation)//0.69b32 - less code
 			if (!_calibrated) {
 				_tsAdcMinX = 0;  _tsAdcMinY = 0; _tsAdcMaxX = 1023;  _tsAdcMaxY = 1023;
 			} else {
-				_tsAdcMinX = TOUCSRCAL_XLOW; _tsAdcMinY = TOUCSRCAL_YLOW; _tsAdcMaxX = TOUCSRCAL_XHIGH; _tsAdcMaxY = TOUCSRCAL_YHIGH;
+				_tsAdcMinX = _touchrcal_xlow; _tsAdcMinY = _touchrcal_ylow; _tsAdcMaxX = _touchrcal_xhigh; _tsAdcMaxY = _touchrcal_yhigh;
 			}
 		#endif
     break;
@@ -1017,7 +1018,7 @@ void RA8875::setRotation(uint8_t rotation)//0.69b32 - less code
 			if (!_calibrated) {
 				_tsAdcMinX = 1023; _tsAdcMinY = 0; _tsAdcMaxX = 0; _tsAdcMaxY = 1023;
 			} else {
-				_tsAdcMinX = TOUCSRCAL_XHIGH; _tsAdcMinY = TOUCSRCAL_YLOW; _tsAdcMaxX = TOUCSRCAL_XLOW; _tsAdcMaxY = TOUCSRCAL_YHIGH;
+				_tsAdcMinX = _touchrcal_yhigh; _tsAdcMinY = _touchrcal_xlow; _tsAdcMaxX = _touchrcal_ylow; _tsAdcMaxY = _touchrcal_xhigh;
 			}
 		#endif
     break;
@@ -1029,7 +1030,7 @@ void RA8875::setRotation(uint8_t rotation)//0.69b32 - less code
 			if (!_calibrated) {
 				_tsAdcMinX = 1023; _tsAdcMinY = 1023; _tsAdcMaxX = 0; _tsAdcMaxY = 0;
 			} else {
-				_tsAdcMinX = TOUCSRCAL_XHIGH; _tsAdcMinY = TOUCSRCAL_YHIGH; _tsAdcMaxX = TOUCSRCAL_XLOW; _tsAdcMaxY = TOUCSRCAL_YLOW;
+				_tsAdcMinX = _touchrcal_xhigh; _tsAdcMinY = _touchrcal_yhigh; _tsAdcMaxX = _touchrcal_xlow; _tsAdcMaxY = _touchrcal_ylow;
 			}
 		#endif
     break;
@@ -1041,7 +1042,7 @@ void RA8875::setRotation(uint8_t rotation)//0.69b32 - less code
 			if (!_calibrated) {
 				_tsAdcMinX = 0; _tsAdcMinY = 1023; _tsAdcMaxX = 1023; _tsAdcMaxY = 0;
 			} else {
-				_tsAdcMinX = TOUCSRCAL_XLOW; _tsAdcMinY = TOUCSRCAL_YHIGH; _tsAdcMaxX = TOUCSRCAL_XHIGH; _tsAdcMaxY = TOUCSRCAL_YLOW;
+				_tsAdcMinX = _touchrcal_ylow; _tsAdcMinY = _touchrcal_xhigh; _tsAdcMaxX = _touchrcal_yhigh; _tsAdcMaxY = _touchrcal_xlow;
 			}
 		#endif
     break;
@@ -5198,7 +5199,7 @@ bool RA8875::touched(bool safe)
 							_FT5206_INT = false;
 						#elif defined(USE_RA8875_TOUCH)
 							_RA8875_INTS &= ~(1 << 0);//clear
-							_checkInterrupt(2);//clear internal RA int to re-engage
+							//_checkInterrupt(2);//clear internal RA int to re-engage
 						#endif
 					}
 					return true;
@@ -5577,6 +5578,24 @@ boolean RA8875::_isCalibrated(void)
 	#endif
 	if (uncaltetection < 4) return true;
 	return false;
+}
+
+/**************************************************************************/
+/*!   A way to have different calibrations for different displays and
+	  a way to force the system to act like uncalibrated, so you don't have
+	  to edit header file, rebuild, edit header again ...
+*/
+/**************************************************************************/
+void RA8875::setTouchCalibrationData(uint16_t minX, uint16_t maxX, uint16_t minY, uint16_t maxY) 
+{
+	_touchrcal_xlow = minX; 
+	_touchrcal_xhigh = maxX;
+	_touchrcal_ylow = minY;
+	_touchrcal_yhigh = maxY;
+
+	// Lets guess at setting is calibrated. 
+	_calibrated = ((minX >= maxX) || (minY >= maxY)) ? false : true;
+	setRotation(_rotation);	 // make sure it is updated to what ever the rotation is now.
 }
 
 #endif
