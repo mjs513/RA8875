@@ -12,10 +12,7 @@ If you want the maximum precision use the rgb one that it's also faster.
 #include <SPI.h>
 #include <RA8875.h>
 
-#define RA8875_CS 10 //see below...
-/*
-Teensy 3.x can use: 2,6,9,10,15,20,21,22,23
-*/
+#define RA8875_CS 10 //any digital pin
 #define RA8875_RESET 9//any pin or 255 to disable it!
 
 

@@ -8,7 +8,7 @@ The autocenter flag, automatically reset after each use!!!
 #include <SPI.h>
 #include <RA8875.h>
 
-#define RA8875_CS 10 //see below...
+#define RA8875_CS 10 //any digital pin
 #define RA8875_RESET 9//any pin or 255 to disable it!
 
 

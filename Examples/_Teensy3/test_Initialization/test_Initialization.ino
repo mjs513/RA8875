@@ -8,7 +8,7 @@ detect any other configuration problem!
 #include <SPI.h>
 #include <RA8875.h>
 
-#define RA8875_CS 10 //see below...
+#define RA8875_CS 10 //any digital pin
 #define RA8875_RESET 9//any pin or nothing!
 #define RA8875_MOSI 11
 #define RA8875_SCLK 14
