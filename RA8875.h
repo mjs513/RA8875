@@ -458,8 +458,13 @@ using Print::write;
 	int							  _spaceCharWidth;
 	volatile bool				  _needISRrearm;
 	volatile uint8_t			  _enabledInterrups;
+	// Allow up to three displays to have touch?
 	static void 		 		  _isr(void);
-	
+	static void 		 		  _isr1(void);
+	static void 		 		  _isr2(void);
+	static RA8875 				 *_active_touch_objects[3]; 
+	volatile uint8_t 			 _RA8875_INTS = 0b00000000;//container for INT states
+
 	#if !defined(_AVOID_TOUCHSCREEN)
 		volatile bool			  _touchEnabled;
 		volatile bool			  _clearTInt;

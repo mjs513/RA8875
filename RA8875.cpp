@@ -36,7 +36,9 @@ License:GNU General Public License v3.0
 	static volatile bool _FT5206_INT = false;
 #endif
 
-static volatile uint8_t _RA8875_INTS = 0b00000000;//container for INT states
+//static volatile uint8_t _RA8875_INTS = 0b00000000;//container for INT states
+RA8875  *RA8875::_active_touch_objects[3] = {nullptr, nullptr, nullptr}; 
+
 /*------------------------------
 Bit:	Called by:		In use:
 --------------------------------
@@ -74,6 +76,7 @@ Bit:	Called by:		In use:
 		_sclk = sclk_pin;
 		_cs = CSp;
 		_rst = RSTp;
+		_RA8875_INTS = 0b00000000;
 //------------------------------Teensy LC-------------------------------------------
 #elif defined(__MKL26Z64__)
 	RA8875::RA8875(const uint8_t CSp,const uint8_t RSTp,const uint8_t mosi_pin,const uint8_t sclk_pin,const uint8_t miso_pin)
@@ -84,6 +87,7 @@ Bit:	Called by:		In use:
 		_cs = CSp;
 		_rst = RSTp;
 		_pspi = nullptr;
+		_RA8875_INTS = 0b00000000;
 //------------------------------Teensy of the future -------------------------------------------
 #elif defined(__MK64FX512__) || defined(__MK66FX1M0__) || defined(__IMXRT1062__)
 	RA8875::RA8875(const uint8_t CSp,const uint8_t RSTp,const uint8_t mosi_pin,const uint8_t sclk_pin,const uint8_t miso_pin)
@@ -94,18 +98,21 @@ Bit:	Called by:		In use:
 		_cs = CSp;
 		_rst = RSTp;
 		_pspi = nullptr;
+		_RA8875_INTS = 0b00000000;
 //---------------------------------DUE--------------------------------------------
 #elif defined(___DUESTUFF)//DUE
 	RA8875::RA8875(const uint8_t CSp, const uint8_t RSTp) 
 	{
 		_cs = CSp;
 		_rst = RSTp;
+		_RA8875_INTS = 0b00000000;
 //---------------------------------SPARK----------------------------------------
 #elif defined(SPARK)//SPARK
 	RA8875::RA8875(const uint8_t CSp, const uint8_t RSTp) 
 	{
 		_cs = CSp;
 		_rst = RSTp;
+		_RA8875_INTS = 0b00000000;
 //------------------------------ENERGIA-------------------------------------------
 #elif defined(NEEDS_SET_MODULE)
 	RA8875::RA8875(const uint8_t module, const uint8_t RSTp) 
@@ -113,12 +120,14 @@ Bit:	Called by:		In use:
 		selectCS(module);
 		_rst = RSTp;
 		_cs = 255;
+		_RA8875_INTS = 0b00000000;
 //----------------------------8 BIT ARDUINO's---------------------------------------
 #else
 	RA8875::RA8875(const uint8_t CSp, const uint8_t RSTp) 
 	{
 		_cs = CSp;
 		_rst = RSTp;
+		_RA8875_INTS = 0b00000000;
 #endif
 }
 
@@ -5001,8 +5010,19 @@ void RA8875::useINT(const uint8_t INTpin,const uint8_t INTnum)
 /**************************************************************************/
 void RA8875::_isr(void)
 {
-	_RA8875_INTS |= (1 << 0);//set
+	if(_active_touch_objects[0]) _active_touch_objects[0]->_RA8875_INTS |= (1 << 0);//set
 }
+
+void RA8875::_isr1(void)
+{
+	if(_active_touch_objects[1]) _active_touch_objects[1]->_RA8875_INTS |= (1 << 0);//set
+}
+
+void RA8875::_isr2(void)
+{
+	if(_active_touch_objects[2]) _active_touch_objects[2]->_RA8875_INTS |= (1 << 0);//set
+}
+
 
 /**************************************************************************/
 /*!
@@ -5014,14 +5034,25 @@ void RA8875::_isr(void)
 		if parameter _needISRrearm = true will rearm interrupt
 */
 /**************************************************************************/
+#define COUNT_TOUCH_OBJECTS (sizeof(_active_touch_objects)/sizeof(_active_touch_objects[0]))
 void RA8875::enableISR(bool force) 
 {
+	static  void (*touch_object_isr_ptrs[])(void) = {&_isr, &_isr1, &_isr2};
+
 	if (force || _needISRrearm){
+		uint8_t index_touch_object = 0;
+		for (; index_touch_object < COUNT_TOUCH_OBJECTS; index_touch_object++) {
+			if ((_active_touch_objects[index_touch_object] == nullptr) || (_active_touch_objects[index_touch_object] == this)) break;
+		}
+		if (index_touch_object == COUNT_TOUCH_OBJECTS) return; 	// failed to find a free index...
+
+		_active_touch_objects[index_touch_object] = this; // claim this spot.
+
 		_needISRrearm = false;
 		#ifdef digitalPinToInterrupt
-			attachInterrupt(digitalPinToInterrupt(_intPin),_isr,FALLING);
+			attachInterrupt(digitalPinToInterrupt(_intPin),touch_object_isr_ptrs[index_touch_object],FALLING);
 		#else
-			attachInterrupt(_intNum,_isr,FALLING);
+			attachInterrupt(_intNum,touch_object_isr_ptrs[index_touch_object],FALLING);
 		#endif
 		_RA8875_INTS = 0b00000000;//reset all INT bits flags
 		_useISR = true;
