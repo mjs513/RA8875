@@ -25,10 +25,7 @@ You are using 4 wire SPI here, so:
  */
 
 #define SDCSPIN      10//for SD
-#define RA8875_CS 	 20 //see below...
-/*
-Teensy 3.x can use: 2,6,9,10,15,20,21,22,23
-*/
+#define RA8875_CS 	 20 //any digital pin
 #define RA8875_RESET 255//any pin or nothing!
 
 RA8875 tft = RA8875(RA8875_CS, RA8875_RESET); //Teensy3/arduino's
@@ -43,6 +40,7 @@ void setup()
   while (!Serial && ((millis () - debug_start) <= 5000)) ;
   Serial.println("RA8875 start");
 
+  //  begin display: Choose from: RA8875_480x272, RA8875_800x480, RA8875_800x480ALT, Adafruit_480x272, Adafruit_800x480
   tft.begin(RA8875_800x480);
   if (!SD.begin(SDCSPIN, SPI_FULL_SPEED)) {
     Serial.println("SD failed!");

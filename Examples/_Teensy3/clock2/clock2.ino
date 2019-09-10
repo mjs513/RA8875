@@ -5,11 +5,8 @@ A similar clock example but this time uses some RA8875 gauges library function!
 #include <SPI.h>
 #include <RA8875.h>
 
-#define RA8875_CS 10 //see below...
+#define RA8875_CS 10 //any digital pin
 #define RA8875_RESET 9//any pin or nothing!
-/*
-Teensy 3.x can use: 2,6,9,10,15,20,21,22,23
-*/
 
 RA8875 tft = RA8875(RA8875_CS, RA8875_RESET);
 
@@ -28,6 +25,7 @@ void setup() {
   //  Serial.begin(38400);
   //  long unsigned debug_start = millis ();
   //  while (!Serial && ((millis () - debug_start) <= 5000)) ;
+  //  begin display: Choose from: RA8875_480x272, RA8875_800x480, RA8875_800x480ALT, Adafruit_480x272, Adafruit_800x480
   tft.begin(RA8875_800x480);
   clockPos[0] = tft.width() / 2;
   clockPos[1] = tft.height() / 2;

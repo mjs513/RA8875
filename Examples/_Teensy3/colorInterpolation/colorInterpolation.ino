@@ -12,10 +12,7 @@ If you want the maximum precision use the rgb one that it's also faster.
 #include <SPI.h>
 #include <RA8875.h>
 
-#define RA8875_CS 10 //see below...
-/*
-Teensy 3.x can use: 2,6,9,10,15,20,21,22,23
-*/
+#define RA8875_CS 10 //any digital pin
 #define RA8875_RESET 9//any pin or 255 to disable it!
 
 
@@ -29,6 +26,7 @@ void setup()
   // while (!Serial && ((millis () - debug_start) <= 5000)) ;
   // Serial.println("RA8875 start");
 
+  //  begin display: Choose from: RA8875_480x272, RA8875_800x480, RA8875_800x480ALT, Adafruit_480x272, Adafruit_800x480
   tft.begin(RA8875_800x480);
 /*
 The colorInterpolation it's quite simple and has 2 variants:

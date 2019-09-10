@@ -9,7 +9,7 @@ so it's much slower, use it when you are using setActiveWindow.
 #include <SPI.h>
 #include <RA8875.h>
 
-#define RA8875_CS 10 //see below...
+#define RA8875_CS 10 //any digital pin
 #define RA8875_RESET 9//any pin or 255 to disable it!
 
 
@@ -23,6 +23,7 @@ void setup()
   //while (!Serial && ((millis () - debug_start) <= 5000)) ;
   Serial.println("RA8875 start");
 
+  //  begin display: Choose from: RA8875_480x272, RA8875_800x480, RA8875_800x480ALT, Adafruit_480x272, Adafruit_800x480
   tft.begin(RA8875_800x480);
   tft.clearScreen(RA8875_RED);
   tft.setActiveWindow(100,tft.width()-100,100,tft.height()-100);

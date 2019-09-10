@@ -25,6 +25,7 @@ void setup(){
   long unsigned debug_start = millis ();
   while (!Serial && ((millis () - debug_start) <= 5000)) ;
   */
+  //  begin display: Choose from: RA8875_480x272, RA8875_800x480, RA8875_800x480ALT, Adafruit_480x272, Adafruit_800x480
   tft.begin(RA8875_800x480);
   #if defined(USE_FT5206_TOUCH)
   tft.useCapINT(RA8875_INT);//we use the capacitive chip Interrupt out!

@@ -105,6 +105,7 @@ void updateBars(uint16_t origX,uint16_t origY){
 
 void setup() {
   Serial.begin(9600);
+  //  begin display: Choose from: RA8875_480x272, RA8875_800x480, RA8875_800x480ALT, Adafruit_480x272, Adafruit_800x480
   tft.begin(RA8875_480x272);
   // Audio connections require memory to work.  For more
   // detailed information, see the MemoryAndCpuUsage example

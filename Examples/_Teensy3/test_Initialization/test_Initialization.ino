@@ -8,7 +8,7 @@ detect any other configuration problem!
 #include <SPI.h>
 #include <RA8875.h>
 
-#define RA8875_CS 10 //see below...
+#define RA8875_CS 10 //any digital pin
 #define RA8875_RESET 9//any pin or nothing!
 #define RA8875_MOSI 11
 #define RA8875_SCLK 14
@@ -20,6 +20,7 @@ void setup() {
   Serial.begin(38400);
   long unsigned debug_start = millis ();
   while (!Serial && ((millis () - debug_start) <= 5000)) ;
+  //  begin display: Choose from: RA8875_480x272, RA8875_800x480, RA8875_800x480ALT, Adafruit_480x272, Adafruit_800x480
   tft.begin(RA8875_480x272);//initialize library
   if (tft.errorCode() != 0) {
     Serial.println("Initializing error!\n");
