@@ -5343,7 +5343,7 @@ void RA8875::_sendRegFT5206(uint8_t reg,const uint8_t val)
 /**************************************************************************/
 void RA8875::updateTS(void)
 {
-    Wire.requestFrom((uint8_t)_ctpAdrs,(uint8_t)28); //get 28 registers
+    Wire.requestFrom((uint8_t)_ctpAdrs,(uint8_t)31); //get 31 registers
     uint8_t index = 0;
     while(Wire.available()) {
       _cptRegisters[index++] = Wire.read();//fill registers

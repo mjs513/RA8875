@@ -527,7 +527,7 @@ using Print::write;
 		#if defined(USE_FT5206_TOUCH)// FT5206 specifics
 			uint8_t					_intCTSNum;
 			uint8_t					_intCTSPin;
-			uint8_t 				_cptRegisters[28];
+			uint8_t 				_cptRegisters[31];
 			uint8_t					_gesture;
 			uint8_t					_currentTouches;//0...5
 			uint8_t					_currentTouchState;//0,1,2
