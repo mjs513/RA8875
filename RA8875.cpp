@@ -5418,6 +5418,22 @@ uint8_t RA8875::getTouches(void)
 /**************************************************************************/
 uint8_t RA8875::getGesture(void)
 {
+	//if gesture is up, down, left or right, juggle with bit2 & bit3 to match rotation
+	if((_gesture >> 4) & 1){
+		switch(_rotation){
+			case 0:
+				_gesture ^= 1 << 2;
+				if(!((_gesture >> 2) & 1)) _gesture ^= 1 << 3;
+			break;
+			case 1:
+				_gesture ^= 1 << 3;
+			break;
+			case 2:
+				_gesture ^= 1 << 2;
+				if((_gesture >> 2) & 1) _gesture ^= 1 << 3;
+			break;
+		}
+	}
 	return _gesture;
 }
 
