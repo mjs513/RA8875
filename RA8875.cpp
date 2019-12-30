@@ -284,9 +284,9 @@ void RA8875::begin(const enum RA8875sizes s,uint8_t colors, uint32_t SPIMaxSpeed
 	RA8875_WIDTH = _width;
 	RA8875_HEIGHT = _height;
 	_activeWindowXL = 0;
-	_activeWindowXR = RA8875_WIDTH;
+	_activeWindowXR = RA8875_WIDTH-1;
 	_activeWindowYT = 0;
-	_activeWindowYB = RA8875_HEIGHT;
+	_activeWindowYB = RA8875_HEIGHT-1;
 	#if !defined(_AVOID_TOUCHSCREEN)//common to all touch
 		_clearTInt = false;
 		_touchEnabled = false;
@@ -890,8 +890,8 @@ void RA8875::setActiveWindow(int16_t XL,int16_t XR ,int16_t YT ,int16_t YB)
 {
 	if (_portrait){ swapvals(XL,YT); swapvals(XR,YB);}
 	
-	if (XR >= RA8875_WIDTH) XR = RA8875_WIDTH;
-	if (YB >= RA8875_HEIGHT) YB = RA8875_HEIGHT;
+	if (XR >= RA8875_WIDTH-1) XR = RA8875_WIDTH-1;
+	if (YB >= RA8875_HEIGHT-1) YB = RA8875_HEIGHT-1;
 	
 	_activeWindowXL = XL; _activeWindowXR = XR;
 	_activeWindowYT = YT; _activeWindowYB = YB;
@@ -905,8 +905,8 @@ void RA8875::setActiveWindow(int16_t XL,int16_t XR ,int16_t YT ,int16_t YB)
 /**************************************************************************/
 void RA8875::setActiveWindow(void)
 {
-	_activeWindowXL = 0; _activeWindowXR = RA8875_WIDTH;
-	_activeWindowYT = 0; _activeWindowYB = RA8875_HEIGHT;
+	_activeWindowXL = 0; _activeWindowXR = RA8875_WIDTH-1;
+	_activeWindowYT = 0; _activeWindowYB = RA8875_HEIGHT-1;
 	if (_portrait){swapvals(_activeWindowXL,_activeWindowYT); swapvals(_activeWindowXR,_activeWindowYB);}
 	_updateActiveWindow(true);
 }
@@ -4758,13 +4758,13 @@ void RA8875::_updateActiveWindow(bool full)
 		// X
 		_writeRegister(RA8875_HSAW0,    0x00);
 		_writeRegister(RA8875_HSAW0 + 1,0x00);   
-		_writeRegister(RA8875_HEAW0,    (RA8875_WIDTH) & 0xFF);
-		_writeRegister(RA8875_HEAW0 + 1,(RA8875_WIDTH) >> 8);
+		_writeRegister(RA8875_HEAW0,    (RA8875_WIDTH-1) & 0xFF);
+		_writeRegister(RA8875_HEAW0 + 1,(RA8875_WIDTH-1) >> 8);
 		// Y 
 		_writeRegister(RA8875_VSAW0,    0x00);
 		_writeRegister(RA8875_VSAW0 + 1,0x00); 
-		_writeRegister(RA8875_VEAW0,    (RA8875_HEIGHT) & 0xFF); 
-		_writeRegister(RA8875_VEAW0 + 1,(RA8875_HEIGHT) >> 8);
+		_writeRegister(RA8875_VEAW0,    (RA8875_HEIGHT-1) & 0xFF); 
+		_writeRegister(RA8875_VEAW0 + 1,(RA8875_HEIGHT-1) >> 8);
 	} else {
 		// X
 		_writeRegister(RA8875_HSAW0,    _activeWindowXL & 0xFF);
