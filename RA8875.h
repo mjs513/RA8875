@@ -340,6 +340,11 @@ class RA8875 : public Print
 		}
 	}
 	
+	inline void setFontDefault() { 
+		_use_default = 1; 
+		_use_ili_font=0; 
+		_use_gfx_font=0; 
+		};
 	void setFont(const ILI9488_t3_font_t &f);
     void setFont(const GFXfont *f = NULL);
 	void setFontAdafruit(void) { setFont(); }
@@ -534,8 +539,6 @@ class RA8875 : public Print
 	#endif
 #endif
 
-virtual size_t write(uint8_t);
-
 //--------------Text Write -------------------------
 //virtual size_t write(uint8_t b) {
 //	if (_FNTgrandient) _FNTgrandient = false;//cannot use this with write
@@ -548,7 +551,9 @@ virtual size_t write(uint8_t);
 //	return size;
 //}
 
-//using Print::write;
+virtual size_t write(uint8_t c);
+
+using Print::write;
 
  protected:
  	uint32_t textcolorPrexpanded, textbgcolorPrexpanded;
@@ -663,6 +668,9 @@ virtual size_t write(uint8_t);
 	#endif
  private:
  //HACK
+	uint8_t _use_gfx_font = 0;
+	uint8_t  _use_ili_font = 0;
+	uint8_t _use_default = 1;
 	uint8_t textsize, textsize_x, textsize_y;
 	uint16_t textcolor, textbgcolor; 
  

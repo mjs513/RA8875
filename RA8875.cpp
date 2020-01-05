@@ -1917,6 +1917,7 @@ void RA8875::setFontSpacing(uint8_t spc)
 
 void RA8875::_textWrite(const char* buffer, uint16_t len)
  {
+
 	uint16_t i;
 	if (len == 0) len = strlen(buffer);//try get the info from the buffer
 	if (len == 0) return;//better stop here, the string it's really empty!
@@ -1973,6 +1974,7 @@ void RA8875::_textWrite(const char* buffer, uint16_t len)
 				if (!renderOn) _textPosition(_cursorX,_cursorY,false);
 			#endif
 		}
+		cursor_x = _cursorX; cursor_y = _cursorY;
 	}//_absoluteCenter,_relativeCenter,(renderOn && !_backTransparent)
 //-----------------------------------------------------------------------------------------------
 	if (!_textMode && !renderOn) _setTextMode(true);//   go to text
@@ -2157,6 +2159,7 @@ void RA8875::_charWriteR(const char c,uint8_t offset,uint16_t fcolor,uint16_t bc
 			// #endif
 		}//end valid
 	}//end char
+	cursor_x = _cursorX; cursor_y = _cursorY;
 }
 
 /**************************************************************************/
@@ -2196,6 +2199,7 @@ void RA8875::_charWrite(const char c,uint8_t offset)
 			_cursorY += _FNTwidth;
 		}
 	}
+	cursor_x = _cursorX; cursor_y = _cursorY;	
 }
 
 
@@ -5927,6 +5931,11 @@ void RA8875::writeCommand(const uint8_t d)
 
 size_t RA8875::write(uint8_t c)
 {
+	if(_use_default) {
+		if (_FNTgrandient) _FNTgrandient = false;//cannot use this with write
+			_textWrite((const char *)&c, 1);
+			return 1;
+	}
 	if (font) {
 		if (c == '\n') {
 			//cursor_y += font->line_space;
@@ -5961,6 +5970,8 @@ size_t RA8875::write(uint8_t c)
 			}
 		}
 	}
+	_cursorX = cursor_x; 
+	_cursorY = cursor_y;
 	return 1;
 }
 
@@ -5978,7 +5989,7 @@ void RA8875::drawChar(int16_t x, int16_t y, unsigned char c,
 	   ((y + 8 * size_y - 1) < 0))   // Clip top   TODO: is this correct?
 		return;
 
-	Serial.printf("drawchar %d %d %c %x %x %d %d\n", x, y, c, fgcolor, bgcolor, size_x, size_y);
+	//Serial.printf("drawchar %d %d %c %x %x %d %d\n", x, y, c, fgcolor, bgcolor, size_x, size_y);
 	if (fgcolor == bgcolor) {
 		// This transparent approach is only about 20% faster
 		if ((size_x == 1) && (size_y == 1)) {
@@ -6130,7 +6141,8 @@ void RA8875::drawChar(int16_t x, int16_t y, unsigned char c,
 }
 
 void RA8875::setFont(const ILI9488_t3_font_t &f) {
-	Serial.println("Using ILI9488 font!");
+	_use_ili_font = 1;
+	_use_default = 0;
 	_gfx_last_char_x_write = 0;	// Don't use cached data here
 	font = &f;
 	if (gfxFont) {
@@ -6147,6 +6159,8 @@ void RA8875::setFont(const ILI9488_t3_font_t &f) {
 
 // Maybe support GFX Fonts as well?
 void RA8875::setFont(const GFXfont *f) {
+	_use_gfx_font = 1;
+	_use_default = 0;
 	font = NULL;	// turn off the other font... 
 	_gfx_last_char_x_write = 0;	// Don't use cached data here
 	if (f == gfxFont) return;	// same font or lack of so can bail.
