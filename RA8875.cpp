@@ -287,6 +287,16 @@ void RA8875::begin(const enum RA8875sizes s,uint8_t colors, uint32_t SPIMaxSpeed
 	_activeWindowXR = RA8875_WIDTH;
 	_activeWindowYT = 0;
 	_activeWindowYB = RA8875_HEIGHT;
+	
+	//hack
+	cursor_y  = cursor_x    = 0;
+	cursor_y  = cursor_x    = 0;
+	textsize  = 1;
+	wrap      = true;
+	font      = NULL;
+	setClipRect();
+	setOrigin();
+	
 	#if !defined(_AVOID_TOUCHSCREEN)//common to all touch
 		_clearTInt = false;
 		_touchEnabled = false;
@@ -1516,6 +1526,10 @@ void RA8875::setCursor(int16_t x, int16_t y,bool autocenter)
 	
 	_cursorX = x;
 	_cursorY = y;
+	
+	//=======
+	cursor_x = x;
+	cursor_y = y;
 
 	//if _relativeCenter or _absoluteCenter do not apply to registers yet!
 	// Have to go to _textWrite first to calculate the lenght of the entire string and recalculate the correct x,y
@@ -5909,6 +5923,1138 @@ void RA8875::writeCommand(const uint8_t d)
 	#endif
 	_endSend();
 }
+
+
+size_t RA8875::write(uint8_t c)
+{
+	if (font) {
+		if (c == '\n') {
+			//cursor_y += font->line_space;
+			//cursor_x  = 0;
+		} else {
+		  if (c == 13) {
+			cursor_y += font->line_space;
+			cursor_x  = 0;
+		  } else {
+			drawFontChar(c);
+		  }
+		}
+	} else if (gfxFont)  {
+		if (c == '\n') {
+            cursor_y += (int16_t)textsize_y * gfxFont->yAdvance;
+			cursor_x  = 0;
+		} else {
+			drawGFXFontChar(c);
+		}
+	} else {
+		if (c == '\n') {
+			cursor_y += textsize_y*8;
+			cursor_x  = 0;
+		} else if (c == '\r') {
+			// skip em
+		} else {
+			drawChar(cursor_x, cursor_y, c, textcolor, textbgcolor, textsize_x, textsize_y);
+			cursor_x += textsize_x*6;
+			if (wrap && (cursor_x > (_width - textsize_x*6))) {
+				cursor_y += textsize_y*6;
+				cursor_x = 0;
+			}
+		}
+	}
+	return 1;
+}
+
+
+//#include "glcdfont.c"
+extern "C" const unsigned char glcdfont[];
+
+// Draw a character
+void RA8875::drawChar(int16_t x, int16_t y, unsigned char c,
+			    uint16_t fgcolor, uint16_t bgcolor, uint8_t size_x, uint8_t size_y)
+{
+	if((x >= _width)            || // Clip right
+	   (y >= _height)           || // Clip bottom
+	   ((x + 6 * size_x - 1) < 0) || // Clip left  TODO: is this correct?
+	   ((y + 8 * size_y - 1) < 0))   // Clip top   TODO: is this correct?
+		return;
+
+	Serial.printf("drawchar %d %d %c %x %x %d %d\n", x, y, c, fgcolor, bgcolor, size_x, size_y);
+	if (fgcolor == bgcolor) {
+		// This transparent approach is only about 20% faster
+		if ((size_x == 1) && (size_y == 1)) {
+			uint8_t mask = 0x01;
+			int16_t xoff, yoff;
+			for (yoff=0; yoff < 8; yoff++) {
+				uint8_t line = 0;
+				for (xoff=0; xoff < 5; xoff++) {
+					if (glcdfont[c * 5 + xoff] & mask) line |= 1;
+					line <<= 1;
+				}
+				line >>= 1;
+				xoff = 0;
+				while (line) {
+					if (line == 0x1F) {
+						drawFastHLine(x + xoff, y + yoff, 5, fgcolor);
+						break;
+					} else if (line == 0x1E) {
+						drawFastHLine(x + xoff, y + yoff, 4, fgcolor);
+						break;
+					} else if ((line & 0x1C) == 0x1C) {
+						drawFastHLine(x + xoff, y + yoff, 3, fgcolor);
+						line <<= 4;
+						xoff += 4;
+					} else if ((line & 0x18) == 0x18) {
+						drawFastHLine(x + xoff, y + yoff, 2, fgcolor);
+						line <<= 3;
+						xoff += 3;
+					} else if ((line & 0x10) == 0x10) {
+						drawPixel(x + xoff, y + yoff, fgcolor);
+						line <<= 2;
+						xoff += 2;
+					} else {
+						line <<= 1;
+						xoff += 1;
+					}
+				}
+				mask = mask << 1;
+			}
+		} else {
+			uint8_t mask = 0x01;
+			int16_t xoff, yoff;
+			for (yoff=0; yoff < 8; yoff++) {
+				uint8_t line = 0;
+				for (xoff=0; xoff < 5; xoff++) {
+					if (glcdfont[c * 5 + xoff] & mask) line |= 1;
+					line <<= 1;
+				}
+				line >>= 1;
+				xoff = 0;
+				while (line) {
+					if (line == 0x1F) {
+						fillRect(x + xoff * size_x, y + yoff * size_y,
+							5 * size_x, size_y, fgcolor);
+						break;
+					} else if (line == 0x1E) {
+						fillRect(x + xoff * size_x, y + yoff * size_y,
+							4 * size_x, size_y, fgcolor);
+						break;
+					} else if ((line & 0x1C) == 0x1C) {
+						fillRect(x + xoff * size_x, y + yoff * size_y,
+							3 * size_x, size_y, fgcolor);
+						line <<= 4;
+						xoff += 4;
+					} else if ((line & 0x18) == 0x18) {
+						fillRect(x + xoff * size_x, y + yoff * size_y,
+							2 * size_x, size_y, fgcolor);
+						line <<= 3;
+						xoff += 3;
+					} else if ((line & 0x10) == 0x10) {
+						fillRect(x + xoff * size_x, y + yoff * size_y,
+							size_x, size_y, fgcolor);
+						line <<= 2;
+						xoff += 2;
+					} else {
+						line <<= 1;
+						xoff += 1;
+					}
+				}
+				mask = mask << 1;
+			}
+		}
+	} else {
+		// This solid background approach is about 5 time faster
+		uint8_t xc, yc;
+		uint8_t xr, yr;
+		uint8_t mask = 0x01;
+		uint16_t color;
+
+		// We need to offset by the origin.
+		x+=_originx;
+		y+=_originy;
+		int16_t x_char_start = x;  // remember our X where we start outputting...
+
+		if((x >= _displayclipx2)            || // Clip right
+			 (y >= _displayclipy2)           || // Clip bottom
+			 ((x + 6 * size_x - 1) < _displayclipx1) || // Clip left  TODO: this is not correct
+			 ((y + 8 * size_y - 1) < _displayclipy1))   // Clip top   TODO: this is not correct
+			return;
+
+			// need to build actual pixel rectangle we will output into.
+			int16_t y_char_top = y;	// remember the y
+			int16_t w =  6 * size_x;
+			int16_t h = 8 * size_y;
+
+			if(x < _displayclipx1) {	w -= (_displayclipx1-x); x = _displayclipx1; 	}
+			if((x + w - 1) >= _displayclipx2)  w = _displayclipx2  - x;
+			if(y < _displayclipy1) {	h -= (_displayclipy1 - y); y = _displayclipy1; 	}
+			if((y + h - 1) >= _displayclipy2) h = _displayclipy2 - y;
+
+			Serial.printf("%d, %d, %d, %d\n", x, y, x + w -1, y + h - 1);
+			setActiveWindow(x, y, x + w -1, y + h - 1);
+			_startSend();
+			y = y_char_top;	// restore the actual y.
+			writeCommand(RA8875_MRWC);
+			for (yc=0; (yc < 8) && (y < _displayclipy2); yc++) {
+				for (yr=0; (yr < size_y) && (y < _displayclipy2); yr++) {
+					x = x_char_start; 		// get our first x position...
+					if (y >= _displayclipy1) {
+						for (xc=0; xc < 5; xc++) {
+							if (glcdfont[c * 5 + xc] & mask) {
+								color = fgcolor;
+							} else {
+								color = bgcolor;
+							}
+							for (xr=0; xr < size_x; xr++) {
+								if ((x >= _displayclipx1) && (x < _displayclipx2)) {
+									//write16BitColor(fgcolor);
+									drawPixel(xr+x,yc+y,fgcolor);
+								}
+								x++;
+							}
+						}
+						for (xr=0; xr < size_x; xr++) {
+							if ((x >= _displayclipx1) && (x < _displayclipx2)) {
+								//write16BitColor(bgcolor);
+								drawPixel(xr+x,yc+y,bgcolor);
+							}
+							x++;
+						}
+					}
+					y++;
+				}
+				mask = mask << 1;
+			}
+			//writecommand_last(ILI9488_NOP);
+			_endSend();
+	}
+}
+
+void RA8875::setFont(const ILI9488_t3_font_t &f) {
+	Serial.println("Using ILI9488 font!");
+	_gfx_last_char_x_write = 0;	// Don't use cached data here
+	font = &f;
+	if (gfxFont) {
+        cursor_y -= 6;
+		gfxFont = NULL;
+	}
+	// Calculate additional metrics for Anti-Aliased font support (BDF extn v2.3)
+
+		// Ensure text and bg color are different. Note: use setTextColor to set actual bg color
+		if (_TXTForeColor == _TXTBackColor) _TXTBackColor = (_TXTForeColor==0x0000)?0xFFFF:0x0000;
+
+}
+
+
+// Maybe support GFX Fonts as well?
+void RA8875::setFont(const GFXfont *f) {
+	font = NULL;	// turn off the other font... 
+	_gfx_last_char_x_write = 0;	// Don't use cached data here
+	if (f == gfxFont) return;	// same font or lack of so can bail.
+
+    if(f) {            // Font struct pointer passed in?
+        if(!gfxFont) { // And no current font struct?
+            // Switching from classic to new font behavior.
+            // Move cursor pos down 6 pixels so it's on baseline.
+            cursor_y += 6;
+        }
+
+        // Test wondering high and low of Ys here... 
+        int8_t miny_offset = 0;
+#if 1
+        for (uint8_t i=0; i <= (f->last - f->first); i++) {
+        	if (f->glyph[i].yOffset < miny_offset) {
+        		miny_offset = f->glyph[i].yOffset;
+        	}
+        }
+#else        
+        int max_delta = 0;
+        uint8_t index_min = 0;
+        uint8_t index_max = 0;
+
+        int8_t minx_offset = 127;
+        int8_t maxx_overlap = 0;
+        uint8_t indexx_min = 0;
+        uint8_t indexx_max = 0;
+        for (uint8_t i=0; i <= (f->last - f->first); i++) {
+        	if (f->glyph[i].yOffset < miny_offset) {
+        		miny_offset = f->glyph[i].yOffset;
+        		index_min = i;
+        	}
+
+        	if (f->glyph[i].xOffset < minx_offset) {
+        		minx_offset = f->glyph[i].xOffset;
+        		indexx_min = i;
+        	}
+        	if ( (f->glyph[i].yOffset + f->glyph[i].height) > max_delta) {
+        		max_delta = (f->glyph[i].yOffset + f->glyph[i].height);
+        		index_max = i;
+        	}
+        	int8_t x_overlap = f->glyph[i].xOffset + f->glyph[i].width - f->glyph[i].xAdvance;
+        	if (x_overlap > maxx_overlap) {
+        		maxx_overlap = x_overlap;
+        		indexx_max = i;
+        	}
+        }
+        Serial.printf("Set GFX Font(%x): Y: %d %d(%c) %d(%c) X: %d(%c) %d(%c)\n", (uint32_t)f, f->yAdvance, 
+        	miny_offset, index_min + f->first, max_delta, index_max + f->first,
+        	minx_offset, indexx_min + f->first, maxx_overlap, indexx_max + f->first);
+#endif
+        _gfxFont_min_yOffset = miny_offset;	// Probably only thing we need... May cache? 
+
+    } else if(gfxFont) { // NULL passed.  Current font struct defined?
+        // Switching from new to classic font behavior.
+        // Move cursor pos up 6 pixels so it's at top-left of char.
+        cursor_y -= 6;
+    }
+    gfxFont = f;
+}
+
+	
+void RA8875::drawFontChar(unsigned int c)
+{
+	uint32_t bitoffset;
+	const uint8_t *data;
+
+	//Serial.printf("drawFontChar(%c) %d\n", c, c);
+
+	if (c >= font->index1_first && c <= font->index1_last) {
+		bitoffset = c - font->index1_first;
+		bitoffset *= font->bits_index;
+	} else if (c >= font->index2_first && c <= font->index2_last) {
+		bitoffset = c - font->index2_first + font->index1_last - font->index1_first + 1;
+		bitoffset *= font->bits_index;
+	} 
+
+	// TODO: implement sparse unicode
+
+	//Serial.printf("  index =  %d\n", fetchbits_unsigned(font->index, bitoffset, font->bits_index));
+	data = font->data + fetchbits_unsigned(font->index, bitoffset, font->bits_index);
+
+	uint32_t encoding = fetchbits_unsigned(data, 0, 3);
+	if (encoding != 0) return;
+	uint32_t width = fetchbits_unsigned(data, 3, font->bits_width);
+	bitoffset = font->bits_width + 3;
+	uint32_t height = fetchbits_unsigned(data, bitoffset, font->bits_height);
+	bitoffset += font->bits_height;
+	//Serial.printf("  size =   %d,%d\n", width, height);
+	//Serial.printf("  line space = %d\n", font->line_space);
+
+	int32_t xoffset = fetchbits_signed(data, bitoffset, font->bits_xoffset);
+	bitoffset += font->bits_xoffset;
+	int32_t yoffset = fetchbits_signed(data, bitoffset, font->bits_yoffset);
+	bitoffset += font->bits_yoffset;
+	//Serial.printf("  offset = %d,%d\n", xoffset, yoffset);
+
+	uint32_t delta = fetchbits_unsigned(data, bitoffset, font->bits_delta);
+	bitoffset += font->bits_delta;
+	//Serial.printf("  delta =  %d\n", delta);
+	
+	//horizontally, we draw every pixel, or none at all
+	if (cursor_x < 0) cursor_x = 0;
+	int32_t origin_x = cursor_x + xoffset;
+	if (origin_x < 0) {
+		cursor_x -= xoffset;
+		origin_x = 0;
+	}
+	if (origin_x + (int)width > _width) {
+		if (!wrap) return;
+		origin_x = 0;
+		if (xoffset >= 0) {
+			cursor_x = 0;
+		} else {
+			cursor_x = -xoffset;
+		}
+		cursor_y += font->line_space;
+	}
+
+	if (cursor_y >= _height) return;
+
+	// vertically, the top and/or bottom can be clipped
+	int32_t origin_y = cursor_y + font->cap_height - height - yoffset;
+
+	// TODO: compute top skip and number of lines
+	int32_t linecount = height;
+	//uint32_t loopcount = 0;
+	int32_t y = origin_y;
+	bool opaque = (_TXTBackColor != _TXTForeColor);
+
+
+	// Going to try a fast Opaque method which works similar to drawChar, which is near the speed of writerect
+	if (!opaque) {
+		while (linecount > 0) {
+			//Serial.printf("    linecount = %d\n", linecount);
+			uint32_t n = 1;
+			if (fetchbit(data, bitoffset++) != 0) {
+				n = fetchbits_unsigned(data, bitoffset, 3) + 2;
+				bitoffset += 3;
+			}
+			uint32_t x = 0;
+			do {
+				int32_t xsize = width - x;
+				if (xsize > 32) xsize = 32;
+				uint32_t bits = fetchbits_unsigned(data, bitoffset, xsize);
+				//Serial.printf("    multi line %d %d %x\n", n, x, bits);
+				drawFontBits(opaque, bits, xsize, origin_x + x, y, n);
+				bitoffset += xsize;
+				x += xsize;
+			} while (x < width);
+
+
+			y += n;
+			linecount -= n;
+			//if (++loopcount > 100) {
+				//Serial.println("     abort draw loop");
+				//break;
+			//}
+		}
+	} else {
+		// Now opaque mode... 
+		// Now write out background color for the number of rows above the above the character
+		// figure out bounding rectangle... 
+		// In this mode we need to update to use the offset and bounding rectangles as we are doing it it direct.
+		// also update the Origin 
+		int cursor_x_origin = cursor_x + _originx;
+		int cursor_y_origin = cursor_y + _originy;
+		origin_x += _originx;
+		origin_y += _originy;
+
+
+
+		int start_x = (origin_x < cursor_x_origin) ? origin_x : cursor_x_origin; 	
+		if (start_x < 0) start_x = 0;
+		
+		int start_y = (origin_y < cursor_y_origin) ? origin_y : cursor_y_origin; 
+		if (start_y < 0) start_y = 0;
+		int end_x = cursor_x_origin + delta; 
+		if ((origin_x + (int)width) > end_x)
+			end_x = origin_x + (int)width;
+		if (end_x >= _displayclipx2)  end_x = _displayclipx2;	
+		int end_y = cursor_y_origin + font->line_space; 
+		if ((origin_y + (int)height) > end_y)
+			end_y = origin_y + (int)height;
+		if (end_y >= _displayclipy2) end_y = _displayclipy2;	
+		end_x--;	// setup to last one we draw
+		end_y--;
+		int start_x_min = (start_x >= _displayclipx1) ? start_x : _displayclipx1;
+		int start_y_min = (start_y >= _displayclipy1) ? start_y : _displayclipy1;
+
+		// See if anything is in the display area.
+		if((end_x < _displayclipx1) ||(start_x >= _displayclipx2) || (end_y < _displayclipy1) || (start_y >= _displayclipy2)) {
+			cursor_x += delta;	// could use goto or another indent level...
+		 	//return;
+		}
+/*
+		Serial.printf("drawFontChar(%c) %d\n", c, c);
+		Serial.printf("  size =   %d,%d\n", width, height);
+		Serial.printf("  line space = %d\n", font->line_space);
+		Serial.printf("  offset = %d,%d\n", xoffset, yoffset);
+		Serial.printf("  delta =  %d\n", delta);
+		Serial.printf("  cursor = %d,%d\n", cursor_x, cursor_y);
+		Serial.printf("  origin = %d,%d\n", origin_x, origin_y);
+
+		Serial.printf("  Bounding: (%d, %d)-(%d, %d)\n", start_x, start_y, end_x, end_y);
+		Serial.printf("  mins (%d %d),\n", start_x_min, start_y_min);
+*/
+			_startSend();
+			//Serial.printf("SetAddr %d %d %d %d\n", start_x_min, start_y_min, end_x, end_y);
+			// output rectangle we are updating... We have already clipped end_x/y, but not yet start_x/y
+			//setActiveWindow( start_x_min, start_y_min, end_x, end_y);
+			
+			//writecommand_cont(ILI9488_RAMWR);
+			writeCommand(RA8875_MRWC);
+			int screen_y = start_y_min;
+			int screen_x;
+			while (screen_y < origin_y) {
+				for (screen_x = start_x_min; screen_x <= end_x; screen_x++) {
+					drawPixel(screen_x, screen_y, _TXTBackColor);
+				}
+				screen_y++;
+			}
+
+			// Now lets process each of the data lines. 
+			screen_y = origin_y;
+			while (linecount > 0) {
+				//Serial.printf("    linecount = %d\n", linecount);
+				uint32_t b = fetchbit(data, bitoffset++);
+				uint32_t n;
+				if (b == 0) {
+					//Serial.println("    Single");
+					n = 1;
+				} else {
+					//Serial.println("    Multi");
+					n = fetchbits_unsigned(data, bitoffset, 3) + 2;
+					bitoffset += 3;
+				}
+				uint32_t bitoffset_row_start = bitoffset;
+				while (n--) {
+					// do some clipping here. 
+					bitoffset = bitoffset_row_start;	// we will work through these bits maybe multiple times
+					// We need to handle case where some of the bits may not be visible, but we still need to
+					// read through them
+					//Serial.printf("y:%d  %d %d %d %d\n", screen_y, start_x, origin_x, _displayclipx1, _displayclipx2);
+					if ((screen_y >= _displayclipy1) && (screen_y < _displayclipy2)) {
+						for (screen_x = start_x; screen_x < origin_x; screen_x++) {
+							if ((screen_x >= _displayclipx1) && (screen_x < _displayclipx2)) {
+								//Serial.write('-');
+								drawPixel(screen_x,screen_y, _TXTBackColor);
+							}
+						}
+					}	
+					uint32_t x = 0;
+					screen_x = origin_x;
+					do {
+						uint32_t xsize = width - x;
+						if (xsize > 32) xsize = 32;
+						uint32_t bits = fetchbits_unsigned(data, bitoffset, xsize);
+						uint32_t bit_mask = 1 << (xsize-1);
+						//Serial.printf("     %d %d %x %x - ", x, xsize, bits, bit_mask);
+						if ((screen_y >= _displayclipy1) && (screen_y < _displayclipy2)) {
+							while (bit_mask) {
+								if ((screen_x >= _displayclipx1) && (screen_x < _displayclipx2)) {
+									drawPixel(screen_x,screen_y,(bits & bit_mask) ? _TXTForeColor : _TXTBackColor);
+									//Serial.write((bits & bit_mask) ? '*' : '.');
+								}
+								bit_mask = bit_mask >> 1;
+								screen_x++ ; // Current actual screen X
+							}
+							//Serial.println();
+							bitoffset += xsize;
+						}
+						x += xsize;
+					} while (x < width) ;
+					if ((screen_y >= _displayclipy1) && (screen_y < _displayclipy2)) {
+						// output bg color and right hand side
+						while (screen_x++ <= end_x) {
+							drawPixel(screen_x,screen_y,_TXTBackColor);
+							//Serial.write('+');
+						}
+						//Serial.println();
+					}
+		 			screen_y++;
+					linecount--;
+				}
+			}
+
+			// clear below character - note reusing xcreen_x for this
+			screen_x = (end_y + 1 - screen_y) * (end_x + 1 - start_x_min); // How many bytes we need to still output
+			//Serial.printf("Clear Below: %d\n", screen_x);
+			while (screen_x-- > 1) {
+				drawPixel(screen_x,screen_y,_TXTBackColor);
+			}
+			drawPixel(screen_x,screen_y,_TXTBackColor);
+			_endSend();
+
+	}
+	// Increment to setup for the next character.
+	cursor_x += delta;
+}
+
+//strPixelLen			- gets pixel length of given ASCII string
+int16_t RA8875::strPixelLen(const char * str)
+{
+//	Serial.printf("strPixelLen %s\n", str);
+	if (!str) return(0);
+	if (gfxFont) 
+	{
+		// BUGBUG:: just use the other function for now... May do this for all of them...
+	  int16_t x, y;
+	  uint16_t w, h;
+	  getTextBounds(str, cursor_x, cursor_y, &x, &y, &w, &h);
+	  return w;
+	}
+
+	uint16_t len=0, maxlen=0;
+	while (*str)
+	{
+		if (*str=='\n')
+		{
+			if ( len > maxlen )
+			{
+				maxlen=len;
+				len=0;
+			}
+		}
+		else
+		{
+			if (!font)
+			{
+				len+=textsize_x*6;
+			}
+			else
+			{
+
+				uint32_t bitoffset;
+				const uint8_t *data;
+				uint16_t c = *str;
+
+//				Serial.printf("char %c(%d)\n", c,c);
+
+				if (c >= font->index1_first && c <= font->index1_last) {
+					bitoffset = c - font->index1_first;
+					bitoffset *= font->bits_index;
+				} else if (c >= font->index2_first && c <= font->index2_last) {
+					bitoffset = c - font->index2_first + font->index1_last - font->index1_first + 1;
+					bitoffset *= font->bits_index;
+				} else if (font->unicode) {
+					continue;
+				} else {
+					continue;
+				}
+				//Serial.printf("  index =  %d\n", fetchbits_unsigned(font->index, bitoffset, font->bits_index));
+				data = font->data + fetchbits_unsigned(font->index, bitoffset, font->bits_index);
+
+				uint32_t encoding = fetchbits_unsigned(data, 0, 3);
+				if (encoding != 0) continue;
+//				uint32_t width = fetchbits_unsigned(data, 3, font->bits_width);
+//				Serial.printf("  width =  %d\n", width);
+				bitoffset = font->bits_width + 3;
+				bitoffset += font->bits_height;
+
+//				int32_t xoffset = fetchbits_signed(data, bitoffset, font->bits_xoffset);
+//				Serial.printf("  xoffset =  %d\n", xoffset);
+				bitoffset += font->bits_xoffset;
+				bitoffset += font->bits_yoffset;
+
+				uint32_t delta = fetchbits_unsigned(data, bitoffset, font->bits_delta);
+				bitoffset += font->bits_delta;
+//				Serial.printf("  delta =  %d\n", delta);
+
+				len += delta;//+width-xoffset;
+//				Serial.printf("  len =  %d\n", len);
+				if ( len > maxlen )
+				{
+					maxlen=len;
+//					Serial.printf("  maxlen =  %d\n", maxlen);
+				}
+			
+			}
+		}
+		str++;
+	}
+//	Serial.printf("Return  maxlen =  %d\n", maxlen);
+	return( maxlen );
+}
+
+void RA8875::charBounds(char c, int16_t *x, int16_t *y,
+  int16_t *minx, int16_t *miny, int16_t *maxx, int16_t *maxy) {
+
+	// BUGBUG:: Not handling offset/clip
+    if (font) {
+        if(c == '\n') { // Newline?
+            *x  = 0;    // Reset x to zero, advance y by one line
+            *y += font->line_space;
+        } else if(c != '\r') { // Not a carriage return; is normal char
+			uint32_t bitoffset;
+			const uint8_t *data;
+			if (c >= font->index1_first && c <= font->index1_last) {
+				bitoffset = c - font->index1_first;
+				bitoffset *= font->bits_index;
+			} else if (c >= font->index2_first && c <= font->index2_last) {
+				bitoffset = c - font->index2_first + font->index1_last - font->index1_first + 1;
+				bitoffset *= font->bits_index;
+			} else if (font->unicode) {
+				return; // TODO: implement sparse unicode
+			} else {
+				return;
+			}
+			//Serial.printf("  index =  %d\n", fetchbits_unsigned(font->index, bitoffset, font->bits_index));
+			data = font->data + fetchbits_unsigned(font->index, bitoffset, font->bits_index);
+
+			uint32_t encoding = fetchbits_unsigned(data, 0, 3);
+			if (encoding != 0) return;
+			uint32_t width = fetchbits_unsigned(data, 3, font->bits_width);
+			bitoffset = font->bits_width + 3;
+			uint32_t height = fetchbits_unsigned(data, bitoffset, font->bits_height);
+			bitoffset += font->bits_height;
+			//Serial.printf("  size =   %d,%d\n", width, height);
+			//Serial.printf("  line space = %d\n", font->line_space);
+
+			int32_t xoffset = fetchbits_signed(data, bitoffset, font->bits_xoffset);
+			bitoffset += font->bits_xoffset;
+			int32_t yoffset = fetchbits_signed(data, bitoffset, font->bits_yoffset);
+			bitoffset += font->bits_yoffset;
+
+			uint32_t delta = fetchbits_unsigned(data, bitoffset, font->bits_delta);
+			bitoffset += font->bits_delta;
+
+            int16_t
+                    x1 = *x + xoffset,
+                    y1 = *y + yoffset,
+                    x2 = x1 + width,
+                    y2 = y1 + height;
+
+		    if(wrap && (x2 > _width)) {
+	            *x  = 0; // Reset x to zero, advance y by one line
+	            *y += font->line_space;
+	            x1 = *x + xoffset,
+	            y1 = *y + yoffset,
+	            x2 = x1 + width,
+	            y2 = y1 + height;
+        	}
+            if(x1 < *minx) *minx = x1;
+            if(y1 < *miny) *miny = y1;
+            if(x2 > *maxx) *maxx = x2;
+            if(y2 > *maxy) *maxy = y2;
+            *x += delta;	// ? guessing here...
+        }
+    } 
+
+    else if(gfxFont) {
+
+        if(c == '\n') { // Newline?
+            *x  = 0;    // Reset x to zero, advance y by one line
+            *y += textsize_y * gfxFont->yAdvance;
+        } else if(c != '\r') { // Not a carriage return; is normal char
+            uint8_t first = gfxFont->first,
+                    last  = gfxFont->last;
+            if((c >= first) && (c <= last)) { // Char present in this font?
+    			GFXglyph *glyph  = gfxFont->glyph + (c - first);
+                uint8_t gw = glyph->width,
+                        gh = glyph->height,
+                        xa = glyph->xAdvance;
+                int8_t  xo = glyph->xOffset,
+                        yo = glyph->yOffset + gfxFont->yAdvance/2;
+                if(wrap && ((*x+(((int16_t)xo+gw)*textsize_x)) > _width)) {
+                    *x  = 0; // Reset x to zero, advance y by one line
+                    *y += textsize_y * gfxFont->yAdvance;
+                }
+                int16_t tsx = (int16_t)textsize_x,
+                        tsy = (int16_t)textsize_y,
+                        x1 = *x + xo * tsx,
+                        y1 = *y + yo * tsy,
+                        x2 = x1 + gw * tsx - 1,
+                        y2 = y1 + gh * tsy - 1;
+                if(x1 < *minx) *minx = x1;
+                if(y1 < *miny) *miny = y1;
+                if(x2 > *maxx) *maxx = x2;
+                if(y2 > *maxy) *maxy = y2;
+                *x += xa * tsx;
+            }
+        }
+
+    } else { // Default font
+
+        if(c == '\n') {                     // Newline?
+            *x  = 0;                        // Reset x to zero,
+            *y += textsize_y * 8;           // advance y one line
+            // min/max x/y unchaged -- that waits for next 'normal' character
+        } else if(c != '\r') {  // Normal char; ignore carriage returns
+            if(wrap && ((*x + textsize_x * 6) > _width)) { // Off right?
+                *x  = 0;                    // Reset x to zero,
+                *y += textsize_y * 8;       // advance y one line
+            }
+            int x2 = *x + textsize_x * 6 - 1, // Lower-right pixel of char
+                y2 = *y + textsize_y * 8 - 1;
+            if(x2 > *maxx) *maxx = x2;      // Track max x, y
+            if(y2 > *maxy) *maxy = y2;
+            if(*x < *minx) *minx = *x;      // Track min x, y
+            if(*y < *miny) *miny = *y;
+            *x += textsize_x * 6;             // Advance x one char
+        }
+    }
+}
+
+// Add in Adafruit versions of text bounds calculations. 
+void RA8875::getTextBounds(const char *str, int16_t x, int16_t y,
+        int16_t *x1, int16_t *y1, uint16_t *w, uint16_t *h) {
+    uint8_t c; // Current character
+
+    *x1 = x;
+    *y1 = y;
+    *w  = *h = 0;
+
+    int16_t minx = _width, miny = _height, maxx = -1, maxy = -1;
+
+    while((c = *str++))
+        charBounds(c, &x, &y, &minx, &miny, &maxx, &maxy);
+
+    if(maxx >= minx) {
+        *x1 = minx;
+        *w  = maxx - minx + 1;
+    }
+    if(maxy >= miny) {
+        *y1 = miny;
+        *h  = maxy - miny + 1;
+    }
+}
+
+void RA8875::getTextBounds(const String &str, int16_t x, int16_t y,
+        int16_t *x1, int16_t *y1, uint16_t *w, uint16_t *h) {
+    if (str.length() != 0) {
+        getTextBounds(const_cast<char*>(str.c_str()), x, y, x1, y1, w, h);
+    }
+}
+
+
+void RA8875::drawFontBits(bool opaque, uint32_t bits, uint32_t numbits, int32_t x, int32_t y, uint32_t repeat)
+{
+	if (bits == 0) {
+		if (opaque) {
+			fillRect(x, y, numbits, repeat, _TXTBackColor);
+		}
+	} else {
+		int32_t x1 = x;
+		uint32_t n = numbits;
+		int w;
+		int bgw;
+
+		w = 0;
+		bgw = 0;
+
+		do {
+			n--;
+			if (bits & (1 << n)) {
+				if (bgw>0) {
+					if (opaque) {
+						fillRect(x1 - bgw, y, bgw, repeat, _TXTBackColor);
+					}
+					bgw=0;
+				}
+				w++;
+			} else {
+				if (w>0) {
+					fillRect(x1 - w, y, w, repeat, _TXTForeColor);
+					w = 0;
+				}
+				bgw++;
+			}
+			x1++;
+		} while (n > 0);
+
+		if (w > 0) {
+			fillRect(x1 - w, y, w, repeat, _TXTForeColor);
+		}
+
+		if (bgw > 0) {
+			if (opaque) {
+				fillRect(x1 - bgw, y, bgw, repeat, _TXTBackColor);
+			}
+		}
+	}
+}
+
+void RA8875::drawGFXFontChar(unsigned int c) {
+	// Lets do Adafruit GFX character output here as well
+    if(c == '\r') 	 return;
+    // Some quick and dirty tests to see if we can
+    uint8_t first = gfxFont->first;
+    if((c < first) || (c > gfxFont->last)) return; 
+
+    GFXglyph *glyph  = gfxFont->glyph + (c - first);
+    uint8_t   w     = glyph->width,
+              h     = glyph->height;
+    if((w == 0) || (h == 0))  return;  // Is there an associated bitmap?
+
+    int16_t xo = glyph->xOffset; // sic
+    int16_t yo = glyph->yOffset + gfxFont->yAdvance/2;
+
+    if(wrap && ((cursor_x + textsize_x * (xo + w)) > _width)) {
+        cursor_x  = 0;
+        cursor_y += (int16_t)textsize_y * gfxFont->yAdvance;
+    }
+
+    // Lets do the work to output the font character
+    uint8_t  *bitmap = gfxFont->bitmap;
+
+    uint16_t bo = glyph->bitmapOffset;
+    uint8_t  xx, yy, bits = 0, bit = 0;
+    //Serial.printf("DGFX_char: %c (%d,%d) : %u %u %u %u %d %d %x %x %d\n", c, cursor_x, cursor_y, w, h,  
+    //			glyph->xAdvance, gfxFont->yAdvance, xo, yo, _TXTForeColor, _TXTBackColor, 0);  Serial.flush();
+
+    if (_TXTForeColor == _TXTBackColor) {
+
+	     //Serial.printf("DGFXChar: %c %u, %u, wh:%d %d o:%d %d\n", c, cursor_x, cursor_y, w, h, xo, yo);
+	    // Todo: Add character clipping here
+
+    	// NOTE: Adafruit GFX does not support Opaque font output as there
+    	// are issues with proportionally spaced characters that may overlap
+    	// So the below is not perfect as we may overwrite a small portion 
+    	// of a letter with the next one, when we blank out... 
+    	// But: I prefer to let each of us decide if the limitations are
+    	// worth it or not.  If Not you still have the option to not
+    	// Do transparent mode and instead blank out and blink...
+
+	    for(yy=0; yy<h; yy++) {
+			uint8_t w_left = w;
+	    	xx = 0;
+	        while (w_left) {
+	            if(!(bit & 7)) {
+	                bits = bitmap[bo++];
+	            }
+				// Could try up to 8 bits at time, but start off trying up to 4
+	            uint8_t xCount;
+	            if ((w_left >= 8) && ((bits & 0xff) == 0xff)) {
+	            	xCount = 8;
+	            	//Serial.print("8");
+	                fillRect(cursor_x+(xo+xx)*textsize_x, cursor_y+(yo+yy)*textsize_y,
+	                      xCount * textsize_x, textsize_y, _TXTForeColor);
+	            } else if ((w_left >= 4) && ((bits & 0xf0) == 0xf0)) {
+	            	xCount = 4;
+	            	//Serial.print("4");
+	                fillRect(cursor_x+(xo+xx)*textsize_x, cursor_y+(yo+yy)*textsize_y,
+	                      xCount * textsize_x, textsize_y, _TXTForeColor);
+	            } else if ((w_left >= 3) && ((bits & 0xe0) == 0xe0)) {
+	            	//Serial.print("3");
+	            	xCount = 3;
+	                fillRect(cursor_x+(xo+xx)*textsize_x, cursor_y+(yo+yy)*textsize_y,
+                      xCount * textsize_x, textsize_y, _TXTForeColor);
+	            } else if ((w_left >= 2) && ((bits & 0xc0) == 0xc0)) {
+	            	//Serial.print("2");
+	            	xCount = 2;
+	                fillRect(cursor_x+(xo+xx)*textsize_x, cursor_y+(yo+yy)*textsize_y,
+	                      xCount * textsize_x, textsize_y, _TXTForeColor);
+	            } else {
+	            	xCount = 1;
+	            	if(bits & 0x80) {
+		                if((textsize_x == 1) && (textsize_y == 1)){
+		                    drawPixel(cursor_x+xo+xx, cursor_y+yo+yy, _TXTForeColor);
+		                } else {
+							fillRect(cursor_x+(xo+xx)*textsize_x, cursor_y+(yo+yy)*textsize_y,textsize_x, textsize_y, _TXTForeColor);
+		                }
+		            }
+	            }
+	            xx += xCount;
+	            w_left -= xCount;
+	            bit += xCount;
+	            bits <<= xCount;
+			}
+	    }
+    	_gfx_last_char_x_write = 0;
+		} else {
+		// To Do, properly clipping and offsetting...
+		// This solid background approach is about 5 time faster
+		// Lets calculate bounding rectangle that we will update
+		// We need to offset by the origin.
+
+		// We are going direct so do some offsets and clipping
+		int16_t x_offset_cursor = cursor_x + _originx;	// This is where the offseted cursor is.
+		int16_t x_start = x_offset_cursor;  // I am assuming no negative x offsets.
+		int16_t x_end = x_offset_cursor + (glyph->xAdvance * textsize_x);
+		if (glyph->xAdvance < (xo + w)) x_end = x_offset_cursor + ((xo + w)* textsize_x);  // BUGBUG Overlflows into next char position.
+		int16_t x_left_fill = x_offset_cursor + xo * textsize_x;
+		int16_t x;
+		if (xo < 0) { 
+			// Unusual character that goes back into previous character
+			//Serial.printf("GFX Font char XO < 0: %c %d %d %u %u %u\n", c, xo, yo, w, h, glyph->xAdvance );
+			x_start += xo * textsize_x;
+			x_left_fill = 0;	// Don't need to fill anything here... 
+		}
+
+		int16_t y_start = cursor_y + _originy + (_gfxFont_min_yOffset * textsize_y)+ gfxFont->yAdvance*textsize_y/2;  // UP to most negative value.
+		int16_t y_end = y_start +  gfxFont->yAdvance * textsize_y;  // how far we will update
+		int16_t y = y_start;
+		//int8_t y_top_fill = (yo - _gfxFont_min_yOffset) * textsize_y;	 // both negative like -10 - -16 = 6...
+		int8_t y_top_fill = (yo - gfxFont->yAdvance/2 - _gfxFont_min_yOffset) * textsize_y;
+
+
+		// See if anything is within clip rectangle, if not bail
+		if((x_start >= _displayclipx2)   || // Clip right
+			 (y_start >= _displayclipy2) || // Clip bottom
+			 (x_end < _displayclipx1)    || // Clip left
+			 (y_end < _displayclipy1))  	// Clip top 
+		{
+			// But remember to first update the cursor position
+			cursor_x += glyph->xAdvance * (int16_t)textsize_x;
+			return;
+		}
+
+		// If our y_end > _displayclipy2 set it to _displayclipy2 as to not have to test both  Likewise X
+		if (y_end > _displayclipy2) y_end = _displayclipy2;
+		if (x_end > _displayclipx2) x_end = _displayclipx2;
+		// If we get here and 
+		if (_gfx_last_cursor_y != (cursor_y + _originy))  _gfx_last_char_x_write = 0;
+
+			// lets try to output text in one output rectangle
+			//Serial.printf("    SPI (%d %d) (%d %d)\n", x_start, y_start, x_end, y_end);Serial.flush();
+			// compute the actual region we will output given 
+			_startSend();
+		
+			setActiveWindow((x_start >= _displayclipx1) ? x_start : _displayclipx1, 
+					(y_start >= _displayclipy1) ? y_start : _displayclipy1, 
+					x_end  - 1,  y_end - 1); 
+			writeCommand(RA8875_MRWC);
+			//Serial.printf("SetAddr: %u %u %u %u\n", (x_start >= _displayclipx1) ? x_start : _displayclipx1, 
+			//		(y_start >= _displayclipy1) ? y_start : _displayclipy1, 
+			//		x_end  - 1,  y_end - 1); 
+			// First lets fill in the top parts above the actual rectangle...
+			//Serial.printf("    y_top_fill %d x_left_fill %d\n", y_top_fill, x_left_fill);
+			while (y_top_fill--) {
+				if ( (y >= _displayclipy1) && (y < _displayclipy2)) {
+					for (int16_t xx = x_start; xx < x_end; xx++) {
+						if (xx >= _displayclipx1) {
+							drawPixel(x, y, gfxFontLastCharPosFG(xx,y)? _gfx_last_char_textcolor : (xx < x_offset_cursor)? _gfx_last_char_textbgcolor : _TXTForeColor);
+						}
+					}					
+				}
+				y++;
+			}
+			//Serial.println("    After top fill"); Serial.flush();
+			// Now lets output all of the pixels for each of the rows.. 
+			for(yy=0; (yy<h) && (y < _displayclipy2); yy++) {
+				uint16_t bo_save = bo;
+				uint8_t bit_save = bit;
+				uint8_t bits_save = bits;
+				for (uint8_t yts = 0; (yts < textsize_y) && (y < _displayclipy2); yts++) {
+					// need to repeat the stuff for each row...
+					bo = bo_save;
+					bit = bit_save;
+					bits = bits_save;
+					x = x_start;
+					if (y >= _displayclipy1) {
+						while (x < x_left_fill) {
+							if ( (x >= _displayclipx1) && (x < _displayclipx2)) {
+								// Don't need to check if we are in previous char as in this case x_left_fill is set to 0...
+								drawPixel(x, y, gfxFontLastCharPosFG(x,y)? _gfx_last_char_textcolor :  _TXTBackColor);
+							}
+							x++;
+						}
+				        for(xx=0; xx<w; xx++) {
+				            if(!(bit++ & 7)) {
+				                bits = bitmap[bo++];
+				            }
+				            for (uint8_t xts = 0; xts < textsize_x; xts++) {
+								if ( (x >= _displayclipx1) && (x < _displayclipx2)) {
+									if (bits & 0x80) 
+										drawPixel(x, y, _TXTForeColor); 
+									else  
+										drawPixel(x, y,gfxFontLastCharPosFG(x,y)? _gfx_last_char_textcolor : (x < x_offset_cursor)? _gfx_last_char_textbgcolor : _TXTBackColor);		
+								}
+				            	x++;	// remember our logical position...
+				            }
+				            bits <<= 1;
+				        }
+				        // Fill in any additional bg colors to right of our output
+				        while (x < x_end) {
+							if (x >= _displayclipx1) {
+				        		drawPixel(x, y, gfxFontLastCharPosFG(x,y)? _gfx_last_char_textcolor : (x < x_offset_cursor)? _gfx_last_char_textbgcolor : _TXTBackColor);
+				        	}
+				        	x++;
+				        }
+			    	}
+		        	y++;	// remember which row we just output
+			    }
+		    }
+		    // And output any more rows below us...
+		    //Serial.println("    Bottom fill"); Serial.flush();
+			while (y < y_end) {
+				if (y >= _displayclipy1) {
+					for (int16_t xx = x_start; xx < x_end; xx++) {
+						if (xx >= _displayclipx1)  {
+							drawPixel(x,y, gfxFontLastCharPosFG(xx,y)? _gfx_last_char_textcolor : (xx < x_offset_cursor)? _gfx_last_char_textbgcolor : _TXTBackColor);
+						}
+					}
+				}
+				y++;
+			}
+			//writecommand_last(ILI9488_NOP);
+			_endSend();
+
+		_gfx_c_last = c; 
+		_gfx_last_cursor_x = cursor_x + _originx;  
+		_gfx_last_cursor_y = cursor_y + _originy; 
+		_gfx_last_char_x_write = x_end; 
+		_gfx_last_char_textcolor = _TXTForeColor; 
+		_gfx_last_char_textbgcolor = _TXTBackColor;
+		
+	}
+
+    cursor_x += glyph->xAdvance * (int16_t)textsize_x;
+}
+
+
+// Some fonts overlap characters if we detect that the previous 
+// character wrote out more width than they advanced in X direction
+// we may want to know if the last character output a FG or BG at a position. 
+	// Opaque font chracter overlap?
+//	unsigned int _gfx_c_last;
+//	int16_t   _gfx_last_cursor_x, _gfx_last_cursor_y;
+//	int16_t	 _gfx_last_x_overlap = 0;
+	
+bool RA8875::gfxFontLastCharPosFG(int16_t x, int16_t y) {
+    GFXglyph *glyph  = gfxFont->glyph + (_gfx_c_last -  gfxFont->first);
+
+    uint8_t   w     = glyph->width,
+              h     = glyph->height;
+
+
+    int16_t xo = glyph->xOffset; // sic
+    int16_t yo = glyph->yOffset + gfxFont->yAdvance/2;
+    if (x >= _gfx_last_char_x_write) return false; 	// we did not update here...
+    if (y < (_gfx_last_cursor_y + (yo*textsize_y)))  return false;  // above
+    if (y >= (_gfx_last_cursor_y + (yo+h)*textsize_y)) return false; // below
+
+
+    // Lets compute which Row this y is in the bitmap
+    int16_t y_bitmap = (y - ((_gfx_last_cursor_y + (yo*textsize_y))) + textsize_y - 1) / textsize_y;
+    int16_t x_bitmap = (x - ((_gfx_last_cursor_x + (xo*textsize_x))) + textsize_x - 1) / textsize_x;
+    uint16_t  pixel_bit_offset = y_bitmap * w + x_bitmap;
+
+    return ((gfxFont->bitmap[glyph->bitmapOffset + (pixel_bit_offset >> 3)]) & (0x80 >> (pixel_bit_offset & 0x7)));
+}
+
+
+void RA8875::setTextSize(uint8_t s_x, uint8_t s_y) {
+    textsize_x = (s_x > 0) ? s_x : 1;
+    textsize_y = (s_y > 0) ? s_y : 1;
+	_gfx_last_char_x_write = 0;	// Don't use cached data here
+}
+
+void RA8875::Pixel(int16_t x, int16_t y, uint16_t color)
+ {
+	x+=_originx;
+	y+=_originy;
+
+	if((x < _displayclipx1) ||(x >= _displayclipx2) || (y < _displayclipy1) || (y >= _displayclipy2)) return;
+
+	setActiveWindow(x, y, x, y);
+	writeCommand(RA8875_MRWC);
+	write16BitColor(color);
+}
+
+
+uint32_t RA8875::fetchbit(const uint8_t *p, uint32_t index)
+{
+	if (p[index >> 3] & (1 << (7 - (index & 7)))) return 1;
+	return 0;
+}
+
+uint32_t RA8875::fetchbits_unsigned(const uint8_t *p, uint32_t index, uint32_t required)
+{
+	uint32_t val = 0;
+	do {
+		uint8_t b = p[index >> 3];
+		uint32_t avail = 8 - (index & 7);
+		if (avail <= required) {
+			val <<= avail;
+			val |= b & ((1 << avail) - 1);
+			index += avail;
+			required -= avail;
+		} else {
+			b >>= avail - required;
+			val <<= required;
+			val |= b & ((1 << required) - 1);
+			break;
+		}
+	} while (required);
+	return val;
+}
+
+uint32_t RA8875::fetchbits_signed(const uint8_t *p, uint32_t index, uint32_t required)
+{
+	uint32_t val = fetchbits_unsigned(p, index, required);
+	if (val & (1 << (required - 1))) {
+		return (int32_t)val - (1 << required);
+	}
+	return (int32_t)val;
+}
+
+void RA8875::write16BitColor(uint16_t color, bool last_pixel){
+
+  writeData16(color);
+
+}
+
+
 
 
 /*

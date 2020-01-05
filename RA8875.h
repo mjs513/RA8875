@@ -146,7 +146,7 @@ CS       10		53           YES       CS
 #ifndef _RA8875MC_H_
 #define _RA8875MC_H_
 
-#include "_includes/RA8875_CPU_commons.h"
+#include <inttypes.h>
 
 
 #if !defined(swapvals)
@@ -187,6 +187,58 @@ CJK-Uni:	\u4E00 -> \u9FD5	/u4E ... /u9F
 */
 /* ----------------------------DO NOT TOUCH ANITHING FROM HERE ------------------------*/
 
+
+// Documentation on the ILI9488_t3 font data format:
+// https://forum.pjrc.com/threads/54316-ILI9488_t-font-structure-format
+
+typedef struct {
+	const unsigned char *index;
+	const unsigned char *unicode;
+	const unsigned char *data;
+	unsigned char version;
+	unsigned char reserved;
+	unsigned char index1_first;
+	unsigned char index1_last;
+	unsigned char index2_first;
+	unsigned char index2_last;
+	unsigned char bits_index;
+	unsigned char bits_width;
+	unsigned char bits_height;
+	unsigned char bits_xoffset;
+	unsigned char bits_yoffset;
+	unsigned char bits_delta;
+	unsigned char line_space;
+	unsigned char cap_height;
+} ILI9488_t3_font_t;
+
+// Lets see about supporting Adafruit fonts as well?
+#ifndef _GFXFONT_H_
+#define _GFXFONT_H_
+
+/// Font data stored PER GLYPH
+typedef struct {
+	uint16_t bitmapOffset;     ///< Pointer into GFXfont->bitmap
+	uint8_t  width;            ///< Bitmap dimensions in pixels
+    uint8_t  height;           ///< Bitmap dimensions in pixels
+	uint8_t  xAdvance;         ///< Distance to advance cursor (x axis)
+	int8_t   xOffset;          ///< X dist from cursor pos to UL corner
+    int8_t   yOffset;          ///< Y dist from cursor pos to UL corner
+} GFXglyph;
+
+/// Data stored for FONT AS A WHOLE
+typedef struct { 
+	uint8_t  *bitmap;      ///< Glyph bitmaps, concatenated
+	GFXglyph *glyph;       ///< Glyph array
+	uint8_t   first;       ///< ASCII extents (first char)
+    uint8_t   last;        ///< ASCII extents (last char)
+	uint8_t   yAdvance;    ///< Newline distance (y axis)
+} GFXfont;
+
+#endif // _GFXFONT_H_
+
+#ifdef __cplusplus
+#include "_includes/RA8875_CPU_commons.h"
+
 #include "_includes/font.h"
 #include "_includes/RA8875Registers.h"
 #include "_includes/RA8875ColorPresets.h"
@@ -201,15 +253,12 @@ template <typename T> T PROGMEM_read (const T * sce)
   }
 #endif
 
-
-
-
 #if defined(ESP8266) && defined(_FASTSSPORT)
 	#include <eagle_soc.h>
 #endif
 
-
-class RA8875 : public Print {
+class RA8875 : public Print
+{
  public:
 	// void 		debugData(uint16_t data,uint8_t len=8);
 	// void 		showLineBuffer(uint8_t data[],int len);
@@ -249,6 +298,74 @@ class RA8875 : public Print {
 //------------ Low Level functions ---------------------------------------------------------
 	void    	writeCommand(const uint8_t d);
 	void  		writeData16(uint16_t data);
+//Hack fonts
+	// setOrigin sets an offset in display pixels where drawing to (0,0) will appear
+	// for example: setOrigin(10,10); drawPixel(5,5); will cause a pixel to be drawn at hardware pixel (15,15)
+	void setOrigin(int16_t x = 0, int16_t y = 0) { 
+		_originx = x; _originy = y; 
+		//if (Serial) Serial.printf("Set Origin %d %d\n", x, y);
+		updateDisplayClip();
+	}
+	void getOrigin(int16_t* x, int16_t* y) { *x = _originx; *y = _originy; }
+
+	// setClipRect() sets a clipping rectangle (relative to any set origin) for drawing to be limited to.
+	// Drawing is also restricted to the bounds of the display
+
+	void setClipRect(int16_t x1, int16_t y1, int16_t w, int16_t h) 
+		{ _clipx1 = x1; _clipy1 = y1; _clipx2 = x1+w; _clipy2 = y1+h; 
+			//if (Serial) Serial.printf("Set clip Rect %d %d %d %d\n", x1, y1, w, h);
+			updateDisplayClip();
+		}
+	void setClipRect() {
+			 _clipx1 = 0; _clipy1 = 0; _clipx2 = _width; _clipy2 = _height; 
+			//if (Serial) Serial.printf("clear clip Rect\n");
+			 updateDisplayClip(); 
+		}
+		
+	bool _invisible = false; 
+	bool _standard = true; // no bounding rectangle or origin set. 
+
+	inline void updateDisplayClip() {
+		_displayclipx1 = max(0,min(_clipx1+_originx,width()));
+		_displayclipx2 = max(0,min(_clipx2+_originx,width()));
+
+		_displayclipy1 = max(0,min(_clipy1+_originy,height()));
+		_displayclipy2 = max(0,min(_clipy2+_originy,height()));
+		_invisible = (_displayclipx1 == _displayclipx2 || _displayclipy1 == _displayclipy2);
+		_standard =  (_displayclipx1 == 0) && (_displayclipx2 == _width) && (_displayclipy1 == 0) && (_displayclipy2 == _height);
+		if (Serial) {
+			//Serial.printf("UDC (%d %d)-(%d %d) %d %d\n", _displayclipx1, _displayclipy1, _displayclipx2, 
+			//	_displayclipy2, _invisible, _standard);
+
+		}
+	}
+	
+	void setFont(const ILI9488_t3_font_t &f);
+    void setFont(const GFXfont *f = NULL);
+	void setFontAdafruit(void) { setFont(); }
+	void drawFontChar(unsigned int c);
+	void drawGFXFontChar(unsigned int c);
+	
+    void setTextSize(uint8_t sx, uint8_t sy);
+	void inline setTextSize(uint8_t s) { setTextSize(s,s); }
+	
+	void drawChar(int16_t x, int16_t y, unsigned char c, uint16_t color, uint16_t bg, uint8_t size_x, uint8_t size_y);
+	void inline drawChar(int16_t x, int16_t y, unsigned char c, uint16_t color, uint16_t bg, uint8_t size) 
+	    { drawChar(x, y, c, color, bg, size);}
+	void drawFontBits(bool opaque, uint32_t bits, uint32_t numbits, int32_t x, int32_t y, uint32_t repeat);
+	void Pixel(int16_t x, int16_t y, uint16_t color);
+	
+	void charBounds(char c, int16_t *x, int16_t *y,
+		int16_t *minx, int16_t *miny, int16_t *maxx, int16_t *maxy);
+    void getTextBounds(const char *string, int16_t x, int16_t y,
+      int16_t *x1, int16_t *y1, uint16_t *w, uint16_t *h);
+    void getTextBounds(const String &str, int16_t x, int16_t y,
+      int16_t *x1, int16_t *y1, uint16_t *w, uint16_t *h);
+	int16_t strPixelLen(const char * str);
+
+	void drawFontPixel( uint8_t alpha, uint32_t x, uint32_t y );
+
+	void write16BitColor(uint16_t color, bool last_pixel=false);
 //-------------- AREA ----------------------------------------------------------------------
 	void		setActiveWindow(int16_t XL,int16_t XR,int16_t YT,int16_t YB);//The working area where to draw on
 	void		setActiveWindow(void);
@@ -302,6 +419,7 @@ class RA8875 : public Print {
 	void 		setFontFullAlign(boolean align);//mmmm... doesn't do nothing! Have to investigate
 	uint8_t 	getFontWidth(boolean inColums=false);
 	uint8_t 	getFontHeight(boolean inRows=false);
+	
 	//----------FONT -------------------------------------------------------------------------
 	void		setExternalFontRom(enum RA8875extRomType ert, enum RA8875extRomCoding erc,enum RA8875extRomFamily erf=STANDARD);
 	void 		setFont(enum RA8875fontSource s);//INTFONT,EXTFONT (if you have a chip installed)
@@ -309,6 +427,7 @@ class RA8875 : public Print {
 	void		setFont(const tFont *font);
 	void 		setIntFontCoding(enum RA8875fontCoding f);
 	void		setExtFontFamily(enum RA8875extRomFamily erf,boolean setReg=true);
+	
 //-------------- GRAPHIC POSITION --------------------------------------------------------------
 	void    	setXY(int16_t x, int16_t y);//graphic set location
 	void 		setX(int16_t x);
@@ -415,21 +534,45 @@ class RA8875 : public Print {
 	#endif
 #endif
 
+virtual size_t write(uint8_t);
+
 //--------------Text Write -------------------------
-virtual size_t write(uint8_t b) {
-	if (_FNTgrandient) _FNTgrandient = false;//cannot use this with write
-	_textWrite((const char *)&b, 1);
-	return 1;
-}
+//virtual size_t write(uint8_t b) {
+//	if (_FNTgrandient) _FNTgrandient = false;//cannot use this with write
+//	_textWrite((const char *)&b, 1);
+//	return 1;
+//}
 
-virtual size_t write(const uint8_t *buffer, size_t size) {
-	_textWrite((const char *)buffer, size);
-	return size;
-}
+//virtual size_t write(const uint8_t *buffer, size_t size) {
+//	_textWrite((const char *)buffer, size);
+//	return size;
+//}
 
-using Print::write;
+//using Print::write;
 
  protected:
+ 	uint32_t textcolorPrexpanded, textbgcolorPrexpanded;
+	boolean wrap; // If set, 'wrap' text at right edge of display
+	const ILI9488_t3_font_t *font;
+	
+	int16_t  cursor_x, cursor_y;
+	int16_t  _clipx1, _clipy1, _clipx2, _clipy2;
+	int16_t  _originx, _originy;
+	int16_t  _displayclipx1, _displayclipy1, _displayclipx2, _displayclipy2;
+	
+ 	// GFX Font support
+	const GFXfont *gfxFont = nullptr;
+	int8_t _gfxFont_min_yOffset = 0;
+	
+	// Opaque font chracter overlap?
+	unsigned int _gfx_c_last;
+	int16_t   _gfx_last_cursor_x, _gfx_last_cursor_y;
+	int16_t	 _gfx_last_char_x_write = 0;
+	uint16_t _gfx_last_char_textcolor;
+	uint16_t _gfx_last_char_textbgcolor;
+	bool gfxFontLastCharPosFG(int16_t x, int16_t y);
+ 
+ //=====================
 	volatile bool 				  _textMode;
 	volatile uint8_t 			  _MWCR0_Reg; //keep track of the register 		  [0x40]
 	int16_t 		 			   RA8875_WIDTH, 	   RA8875_HEIGHT;//absolute
@@ -519,6 +662,10 @@ using Print::write;
 		#endif
 	#endif
  private:
+ //HACK
+	uint8_t textsize, textsize_x, textsize_y;
+	uint16_t textcolor, textbgcolor; 
+ 
 	uint8_t							_rst;
 	uint8_t							_intPin;
 	uint8_t						 	_intNum;
@@ -526,6 +673,12 @@ using Print::write;
 	const tFont 			  	 *  _currentFont;
 	bool 						 	_checkInterrupt(uint8_t _bit,bool _clear=true);
 	void 						    _disableISR(void);
+	
+	uint32_t fetchbit(const uint8_t *p, uint32_t index);
+	uint32_t fetchbits_unsigned(const uint8_t *p, uint32_t index, uint32_t required);
+	uint32_t fetchbits_signed(const uint8_t *p, uint32_t index, uint32_t required);
+	
+	
 	// Touch Screen vars ---------------------
 	#if !defined(_AVOID_TOUCHSCREEN)
 	uint8_t						    _maxTouch;//5 on FT5206, 1 on resistive
@@ -862,4 +1015,6 @@ void _slowDownSPI(bool slow,uint32_t slowSpeed=10000000UL)
 		
 #endif
 };
+#endif // __cplusplus
+
 #endif
