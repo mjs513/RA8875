@@ -343,7 +343,9 @@ class RA8875 : public Print
 	inline void setFontDefault() { 
 		_use_default = 1; 
 		_use_ili_font=0; 
-		_use_gfx_font=0; 
+		_use_gfx_font=0;
+		setActiveWindow();
+		_textPosition(_cursorX, _cursorY, false);
 		};
 	void setFont(const ILI9488_t3_font_t &f);
     void setFont(const GFXfont *f = NULL);
@@ -546,21 +548,20 @@ class RA8875 : public Print
 //	return 1;
 //}
 
-//virtual size_t write(const uint8_t *buffer, size_t size) {
+//virtual size_t write(const uint8_t *buffer, size_t size){
 //	_textWrite((const char *)buffer, size);
 //	return size;
 //}
 
 virtual size_t write(uint8_t c);
 
-using Print::write;
+//using Print::write;
 
  protected:
  	uint32_t textcolorPrexpanded, textbgcolorPrexpanded;
 	boolean wrap; // If set, 'wrap' text at right edge of display
 	const ILI9488_t3_font_t *font;
 	
-	int16_t  cursor_x, cursor_y;
 	int16_t  _clipx1, _clipy1, _clipx2, _clipy2;
 	int16_t  _originx, _originy;
 	int16_t  _displayclipx1, _displayclipy1, _displayclipx2, _displayclipy2;
@@ -571,7 +572,7 @@ using Print::write;
 	
 	// Opaque font chracter overlap?
 	unsigned int _gfx_c_last;
-	int16_t   _gfx_last_cursor_x, _gfx_last_cursor_y;
+	int16_t   _gfx_last__cursorX, _gfx_last__cursorY;
 	int16_t	 _gfx_last_char_x_write = 0;
 	uint16_t _gfx_last_char_textcolor;
 	uint16_t _gfx_last_char_textbgcolor;

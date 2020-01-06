@@ -19,8 +19,7 @@ void setup() {
   
   tft.setRotation(2);
   tft.fillWindow(RA8875_BLACK);
-
-  //tft.setFontDefault();
+  
   tft.setTextColor(RA8875_WHITE);
   tft.println("This is a test");
   tft.println(" of the default font");
@@ -32,17 +31,18 @@ void setup() {
   tft.println(" of ILIxxx font ComicSansMS_12");
   tft.println();
 
-  tft.setTextSize(1,1);
-  //tft.setCursor(0, 120);
+  tft.setTextColor(RA8875_WHITE, RA8875_RED);
   tft.setFont(&FreeSansOblique12pt7b);
   tft.println("This is a test of GFX");
   tft.println(" of GFX font FreeSansOblique12pt");
 
   tft.setFontDefault();
   tft.setTextColor(RA8875_GREEN);
-  tft.println(); //kludge>>>
-  tft.println("This is a test");
-  tft.println(" of the default font!!");
+  tft.setFontScale(1);
+  tft.println("This is default font:");
+  tft.setFontSpacing(1);//now give 5 pix extra spacing between chars
+  tft.println("ABCDEF 1 2 3 4 5 6 7");
+  
 }
 
 void loop() 
