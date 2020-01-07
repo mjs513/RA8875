@@ -1077,7 +1077,7 @@ void RA8875::setRotation(uint8_t rotation)//0.69b32 - less code
 		_FNCR1_Reg &= ~(1 << 4);
 	}
 	_writeRegister(RA8875_FNCR1,_FNCR1_Reg);//0.69b21
-	setActiveWindow();
+	setClipRect();
 }
 
 /**************************************************************************/
