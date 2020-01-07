@@ -342,11 +342,14 @@ class RA8875 : public Print
 	
 	inline void setFontDefault() { 
 		_use_default = 1; 
+		if(_portrait && (!_use_gfx_font || !_use_ili_font)) {
+			_cursorX += _cursorY;
+			_cursorY -= _cursorX;
+		}
 		_use_ili_font=0; 
 		_use_gfx_font=0;
 		setActiveWindow();
 		_textPosition(_cursorX, _cursorY, false);
-		if(_portrait) _cursorX = _cursorY;
 		};
 	void setFont(const ILI9488_t3_font_t &f);
     void setFont(const GFXfont *f = NULL);
@@ -679,7 +682,6 @@ using Print::write;
 	uint8_t _use_default = 1;
 	uint8_t textsize, textsize_x, textsize_y;
 	uint16_t textcolor, textbgcolor; 
-	uint16_t _swap_cursory = 0;
  
 	uint8_t							_rst;
 	uint8_t							_intPin;

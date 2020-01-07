@@ -1077,6 +1077,7 @@ void RA8875::setRotation(uint8_t rotation)//0.69b32 - less code
 		_FNCR1_Reg &= ~(1 << 4);
 	}
 	_writeRegister(RA8875_FNCR1,_FNCR1_Reg);//0.69b21
+	
 	setClipRect();
 }
 
@@ -2189,10 +2190,8 @@ void RA8875::_charWrite(const char c,uint8_t offset)
 		//update cursor
 		if (!_portrait){
 			_cursorX += _FNTwidth;
-			_swap_cursory = 0;
 		} else {
 			_cursorY += _FNTwidth;
-			_swap_cursory = _cursorY;
 		}
 	}
 }
@@ -5928,10 +5927,12 @@ void RA8875::_fontWrite(uint8_t c)
 	if(_use_default) {
 		if (_FNTgrandient) _FNTgrandient = false;//cannot use this with write
 		_textWrite((const char *)&c, 1);
+		//Serial.printf("Default: %c, %d, %d\n", c, _cursorX, _cursorY);
 		return 1;
 	}
 
 	if (font) {
+		//Serial.printf("ILI: %c, %d, %d\n", c, _cursorX, _cursorY);
 		if (c == '\n') {
 			//_cursorY += font->line_space;
 			//_cursorX  = 0;
@@ -5944,6 +5945,7 @@ void RA8875::_fontWrite(uint8_t c)
 		  }
 		}
 	} else if (gfxFont)  {
+		//Serial.printf("GFX: %c, %d, %d\n", c, _cursorX, _cursorY);
 		if (c == '\n') {
             _cursorY += (int16_t)textsize_y * gfxFont->yAdvance;
 			_cursorX  = 0;
@@ -6134,10 +6136,15 @@ void RA8875::drawChar(int16_t x, int16_t y, unsigned char c,
 }
 
 void RA8875::setFont(const ILI9488_t3_font_t &f) {
-	_use_ili_font = 1;
 	_use_default = 0;
+	if(_portrait && !_use_gfx_font) {
+		_cursorY += _cursorX;
+		_cursorX -= _cursorY;
+	}
+	_use_ili_font = 1;
+	_use_gfx_font = 0;
+
 	_gfx_last_char_x_write = 0;	// Don't use cached data here
-	_cursorY += _swap_cursory;
 	font = &f;
 	if (gfxFont) {
         _cursorY -= 6;
@@ -6153,8 +6160,13 @@ void RA8875::setFont(const ILI9488_t3_font_t &f) {
 
 // Maybe support GFX Fonts as well?
 void RA8875::setFont(const GFXfont *f) {
-	_use_gfx_font = 1;
 	_use_default = 0;
+	if(_portrait && !_use_ili_font) {
+		_cursorY += _cursorX;
+		_cursorX -= _cursorY;
+	}
+	_use_gfx_font = 1;
+	_use_ili_font = 0;
 	font = NULL;	// turn off the other font... 
 	_gfx_last_char_x_write = 0;	// Don't use cached data here
 	if (f == gfxFont) return;	// same font or lack of so can bail.
@@ -6361,10 +6373,10 @@ void RA8875::drawFontChar(unsigned int c)
 		Serial.printf("  Bounding: (%d, %d)-(%d, %d)\n", start_x, start_y, end_x, end_y);
 		Serial.printf("  mins (%d %d),\n", start_x_min, start_y_min);
 */
-			//_startSend();
+			_startSend();
 			//Serial.printf("SetAddr %d %d %d %d\n", start_x_min, start_y_min, end_x, end_y);
 			// output rectangle we are updating... We have already clipped end_x/y, but not yet start_x/y
-			//setActiveWindow( start_x_min, start_y_min, end_x, end_y);
+			setActiveWindow( start_x_min, start_y_min, end_x, end_y);
 			
 			//writecommand_cont(ILI9488_RAMWR);
 			//writeCommand(RA8875_MRWC);
@@ -6448,7 +6460,7 @@ void RA8875::drawFontChar(unsigned int c)
 				drawPixel(screen_x,screen_y,_TXTBackColor);
 			}
 			drawPixel(screen_x,screen_y,_TXTBackColor);
-			//_endSend();
+			_endSend();
 
 	}
 	// Increment to setup for the next character.
