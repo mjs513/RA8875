@@ -6761,7 +6761,8 @@ void RA8875::drawGFXFontChar(unsigned int c) {
     GFXglyph *glyph  = gfxFont->glyph + (c - first);
     uint8_t   w     = glyph->width,
               h     = glyph->height;
-    if((w == 0) || (h == 0))  return;  // Is there an associated bitmap?
+	//Serial.printf("w = %d, h = %d\n", w, h);
+    //if((w == 0) || (h == 0))  return;  // Is there an associated bitmap?
 
     int16_t xo = glyph->xOffset; // sic
     int16_t yo = glyph->yOffset + gfxFont->yAdvance/2;
