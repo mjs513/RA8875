@@ -346,6 +346,7 @@ class RA8875 : public Print
 		_use_gfx_font=0;
 		setActiveWindow();
 		_textPosition(_cursorX, _cursorY, false);
+		if(_portrait) _cursorX = _cursorY;
 		};
 	void setFont(const ILI9488_t3_font_t &f);
     void setFont(const GFXfont *f = NULL);
@@ -548,14 +549,18 @@ class RA8875 : public Print
 //	return 1;
 //}
 
+virtual size_t write(uint8_t c) {
+	_fontWrite(c);
+	return 1;
+}
+
 //virtual size_t write(const uint8_t *buffer, size_t size){
 //	_textWrite((const char *)buffer, size);
 //	return size;
 //}
 
-virtual size_t write(uint8_t c);
 
-//using Print::write;
+using Print::write;
 
  protected:
  	uint32_t textcolorPrexpanded, textbgcolorPrexpanded;
@@ -674,6 +679,7 @@ virtual size_t write(uint8_t c);
 	uint8_t _use_default = 1;
 	uint8_t textsize, textsize_x, textsize_y;
 	uint16_t textcolor, textbgcolor; 
+	uint16_t _swap_cursory = 0;
  
 	uint8_t							_rst;
 	uint8_t							_intPin;
@@ -686,6 +692,7 @@ virtual size_t write(uint8_t c);
 	uint32_t fetchbit(const uint8_t *p, uint32_t index);
 	uint32_t fetchbits_unsigned(const uint8_t *p, uint32_t index, uint32_t required);
 	uint32_t fetchbits_signed(const uint8_t *p, uint32_t index, uint32_t required);
+	void 	 _fontWrite(uint8_t c);
 	
 	
 	// Touch Screen vars ---------------------

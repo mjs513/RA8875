@@ -2189,8 +2189,10 @@ void RA8875::_charWrite(const char c,uint8_t offset)
 		//update cursor
 		if (!_portrait){
 			_cursorX += _FNTwidth;
+			_swap_cursory = 0;
 		} else {
 			_cursorY += _FNTwidth;
+			_swap_cursory = _cursorY;
 		}
 	}
 }
@@ -5921,13 +5923,14 @@ void RA8875::writeCommand(const uint8_t d)
 	_endSend();
 }
 
-size_t RA8875::write(uint8_t c)
+void RA8875::_fontWrite(uint8_t c)
 {
 	if(_use_default) {
 		if (_FNTgrandient) _FNTgrandient = false;//cannot use this with write
 		_textWrite((const char *)&c, 1);
 		return 1;
 	}
+
 	if (font) {
 		if (c == '\n') {
 			//_cursorY += font->line_space;
@@ -5962,7 +5965,7 @@ size_t RA8875::write(uint8_t c)
 			}
 		}
 	}
-	return 1;
+	
 }
 
 
@@ -6134,6 +6137,7 @@ void RA8875::setFont(const ILI9488_t3_font_t &f) {
 	_use_ili_font = 1;
 	_use_default = 0;
 	_gfx_last_char_x_write = 0;	// Don't use cached data here
+	_cursorY += _swap_cursory;
 	font = &f;
 	if (gfxFont) {
         _cursorY -= 6;
@@ -6322,8 +6326,6 @@ void RA8875::drawFontChar(unsigned int c)
 		origin_x += _originx;
 		origin_y += _originy;
 
-
-
 		int start_x = (origin_x < _cursorX_origin) ? origin_x : _cursorX_origin; 	
 		if (start_x < 0) start_x = 0;
 		
@@ -6359,13 +6361,13 @@ void RA8875::drawFontChar(unsigned int c)
 		Serial.printf("  Bounding: (%d, %d)-(%d, %d)\n", start_x, start_y, end_x, end_y);
 		Serial.printf("  mins (%d %d),\n", start_x_min, start_y_min);
 */
-			_startSend();
+			//_startSend();
 			//Serial.printf("SetAddr %d %d %d %d\n", start_x_min, start_y_min, end_x, end_y);
 			// output rectangle we are updating... We have already clipped end_x/y, but not yet start_x/y
 			//setActiveWindow( start_x_min, start_y_min, end_x, end_y);
 			
 			//writecommand_cont(ILI9488_RAMWR);
-			writeCommand(RA8875_MRWC);
+			//writeCommand(RA8875_MRWC);
 			int screen_y = start_y_min;
 			int screen_x;
 			while (screen_y < origin_y) {
@@ -6400,7 +6402,7 @@ void RA8875::drawFontChar(unsigned int c)
 						for (screen_x = start_x; screen_x < origin_x; screen_x++) {
 							if ((screen_x >= _displayclipx1) && (screen_x < _displayclipx2)) {
 								//Serial.write('-');
-								drawPixel(screen_x,screen_y, _TXTBackColor);
+								drawPixel(screen_x, screen_y, _TXTBackColor);
 							}
 						}
 					}	
@@ -6446,7 +6448,7 @@ void RA8875::drawFontChar(unsigned int c)
 				drawPixel(screen_x,screen_y,_TXTBackColor);
 			}
 			drawPixel(screen_x,screen_y,_TXTBackColor);
-			_endSend();
+			//_endSend();
 
 	}
 	// Increment to setup for the next character.
@@ -6886,7 +6888,7 @@ void RA8875::drawGFXFontChar(unsigned int c) {
 				if ( (y >= _displayclipy1) && (y < _displayclipy2)) {
 					for (int16_t xx = x_start; xx < x_end; xx++) {
 						if (xx >= _displayclipx1) {
-							drawPixel(x, y, gfxFontLastCharPosFG(xx,y)? _gfx_last_char_textcolor : (xx < x_offset_cursor)? _gfx_last_char_textbgcolor : _TXTForeColor);
+							drawPixel(xx, y, gfxFontLastCharPosFG(xx,y)? _gfx_last_char_textcolor : (xx < x_offset_cursor)? _gfx_last_char_textbgcolor : _TXTBackColor);
 						}
 					}					
 				}
@@ -6944,7 +6946,7 @@ void RA8875::drawGFXFontChar(unsigned int c) {
 				if (y >= _displayclipy1) {
 					for (int16_t xx = x_start; xx < x_end; xx++) {
 						if (xx >= _displayclipx1)  {
-							drawPixel(x,y, gfxFontLastCharPosFG(xx,y)? _gfx_last_char_textcolor : (xx < x_offset_cursor)? _gfx_last_char_textbgcolor : _TXTBackColor);
+							drawPixel(xx ,y, gfxFontLastCharPosFG(xx,y)? _gfx_last_char_textcolor : (xx < x_offset_cursor)? _gfx_last_char_textbgcolor : _TXTBackColor);
 						}
 					}
 				}
