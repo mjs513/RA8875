@@ -1586,7 +1586,7 @@ void RA8875::getCursor(int16_t &x, int16_t &y)
 		t4 = _readRegister(RA8875_F_CURYH);
 		x = (t2 << 8) | (t1 & 0xFF);
 		y = (t4 << 8) | (t3 & 0xFF);
-		if (_portrait) swapvals(x,y);
+		if (_portrait && _use_default) swapvals(x,y);
 	}
 }
 
@@ -1604,18 +1604,18 @@ void RA8875::getCursorFast(int16_t &x, int16_t &y)
 {
 	x = _cursorX;
 	y = _cursorY;
-	if (_portrait) swapvals(x,y);
+	if (_portrait && _use_default) swapvals(x,y);
 }
 
 int16_t RA8875::getCursorX(void)
 {
-	if (_portrait) return _cursorY;
+	if (_portrait && _use_default) return _cursorY;
 	return _cursorX;
 }
 
 int16_t RA8875::getCursorY(void)
 {
-	if (_portrait) return _cursorX;
+	if (_portrait && _use_default) return _cursorX;
 	return _cursorY;
 }
 /**************************************************************************/
