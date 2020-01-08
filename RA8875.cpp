@@ -5928,7 +5928,7 @@ void RA8875::_fontWrite(uint8_t c)
 		if (_FNTgrandient) _FNTgrandient = false;//cannot use this with write
 		_textWrite((const char *)&c, 1);
 		//Serial.printf("Default: %c, %d, %d\n", c, _cursorX, _cursorY);
-		return 1;
+		return;
 	}
 
 	if (font) {
@@ -6235,7 +6235,7 @@ void RA8875::drawFontChar(unsigned int c)
 	uint32_t bitoffset;
 	const uint8_t *data;
 
-	//Serial.printf("drawFontChar(%c) %d\n", c, c);
+	//Serial.printf("drawFontChar(%c) %d %x %x %x\n", c, c, _TXTBackColor, _TXTForeColor, _backTransparent);
 
 	if (c >= font->index1_first && c <= font->index1_last) {
 		bitoffset = c - font->index1_first;
@@ -6296,7 +6296,7 @@ void RA8875::drawFontChar(unsigned int c)
 	int32_t linecount = height;
 	//uint32_t loopcount = 0;
 	int32_t y = origin_y;
-	bool opaque = (_TXTBackColor != _TXTForeColor);
+	bool opaque = !_backTransparent; //(_TXTBackColor != _TXTForeColor);
 
 
 	// Going to try a fast Opaque method which works similar to drawChar, which is near the speed of writerect
@@ -6461,6 +6461,7 @@ void RA8875::drawFontChar(unsigned int c)
 			}
 			drawPixel(screen_x,screen_y,_TXTBackColor);
 			_endSend();
+			setActiveWindow();
 
 	}
 	// Increment to setup for the next character.
@@ -6706,6 +6707,7 @@ void RA8875::getTextBounds(const String &str, int16_t x, int16_t y,
 
 void RA8875::drawFontBits(bool opaque, uint32_t bits, uint32_t numbits, int32_t x, int32_t y, uint32_t repeat)
 {
+	//Serial.printf("    drawFontBits: %d %x %x (%d %d) %u\n", opaque, bits, numbits, x, y, repeat);
 	if (bits == 0) {
 		if (opaque) {
 			fillRect(x, y, numbits, repeat, _TXTBackColor);
@@ -6725,6 +6727,7 @@ void RA8875::drawFontBits(bool opaque, uint32_t bits, uint32_t numbits, int32_t 
 				if (bgw>0) {
 					if (opaque) {
 						fillRect(x1 - bgw, y, bgw, repeat, _TXTBackColor);
+						//Serial.printf("        BG fillrect: %d %d %d %d %x\n", x1 - bgw, y, bgw, repeat, _TXTBackColor);
 					}
 					bgw=0;
 				}
@@ -6732,6 +6735,7 @@ void RA8875::drawFontBits(bool opaque, uint32_t bits, uint32_t numbits, int32_t 
 			} else {
 				if (w>0) {
 					fillRect(x1 - w, y, w, repeat, _TXTForeColor);
+					//Serial.printf("        FG fillrect: %d %d %d %d %x\n", x1 - w, y, w, repeat, _TXTForeColor);
 					w = 0;
 				}
 				bgw++;
@@ -6741,11 +6745,13 @@ void RA8875::drawFontBits(bool opaque, uint32_t bits, uint32_t numbits, int32_t 
 
 		if (w > 0) {
 			fillRect(x1 - w, y, w, repeat, _TXTForeColor);
+			//Serial.printf("        FG fillrect: %d %d %d %d %x\n", x1 - w, y, w, repeat, _TXTForeColor);
 		}
 
 		if (bgw > 0) {
 			if (opaque) {
 				fillRect(x1 - bgw, y, bgw, repeat, _TXTBackColor);
+				//Serial.printf("        BG fillrect: %d %d %d %d %x\n", x1 - bgw, y, bgw, repeat, _TXTBackColor);
 			}
 		}
 	}
@@ -6780,7 +6786,7 @@ void RA8875::drawGFXFontChar(unsigned int c) {
     //Serial.printf("DGFX_char: %c (%d,%d) : %u %u %u %u %d %d %x %x %d\n", c, _cursorX, _cursorY, w, h,  
     //			glyph->xAdvance, gfxFont->yAdvance, xo, yo, _TXTForeColor, _TXTBackColor, 0);  Serial.flush();
 
-    if (_TXTForeColor == _TXTBackColor) {
+    if (_backTransparent) {
 
 	     //Serial.printf("DGFXChar: %c %u, %u, wh:%d %d o:%d %d\n", c, _cursorX, _cursorY, w, h, xo, yo);
 	    // Todo: Add character clipping here
@@ -6967,6 +6973,7 @@ void RA8875::drawGFXFontChar(unsigned int c) {
 			}
 			//writecommand_last(ILI9488_NOP);
 			_endSend();
+		setActiveWindow();
 
 		_gfx_c_last = c; 
 		_gfx_last__cursorX = _cursorX + _originx;  
