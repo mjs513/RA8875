@@ -3706,6 +3706,7 @@ void RA8875::fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color
 	if (w < 2 && h < 2){ //render as pixel
 		drawPixel(x,y,color);
 	} else {			 //render as rect
+		//Serial.printf("        fillRect: %d %d %d %d %x\n", x, y, w, h, color);
 		_rect_helper(x,y,(x+w)-1,(y+h)-1,color,true);//thanks the experimentalist
 	}
 }
@@ -6232,10 +6233,10 @@ void RA8875::setFont(const GFXfont *f) {
 	
 void RA8875::drawFontChar(unsigned int c)
 {
-	uint32_t bitoffset;
+	uint32_t bitoffset = 0;
 	const uint8_t *data;
 
-	//Serial.printf("drawFontChar(%c) %d %x %x %x\n", c, c, _TXTBackColor, _TXTForeColor, _backTransparent);
+	//Serial.printf("drawFontChar(%c) %d (%d, %d) %x %x %x\n", c, c, _cursorX, _cursorY, _TXTBackColor, _TXTForeColor, _backTransparent);
 
 	if (c >= font->index1_first && c <= font->index1_last) {
 		bitoffset = c - font->index1_first;
@@ -6258,6 +6259,7 @@ void RA8875::drawFontChar(unsigned int c)
 	bitoffset += font->bits_height;
 	//Serial.printf("  size =   %d,%d\n", width, height);
 	//Serial.printf("  line space = %d\n", font->line_space);
+	//Serial.printf("  cap height = %d\n", font->cap_height);
 
 	int32_t xoffset = fetchbits_signed(data, bitoffset, font->bits_xoffset);
 	bitoffset += font->bits_xoffset;
@@ -6333,136 +6335,37 @@ void RA8875::drawFontChar(unsigned int c)
 		// figure out bounding rectangle... 
 		// In this mode we need to update to use the offset and bounding rectangles as we are doing it it direct.
 		// also update the Origin 
-		int _cursorX_origin = _cursorX + _originx;
-		int _cursorY_origin = _cursorY + _originy;
-		origin_x += _originx;
-		origin_y += _originy;
+		fillRect(_cursorX, _cursorY, delta, y - _cursorY, _TXTBackColor);
+		while (linecount > 0) {
+			//Serial.printf("    linecount = %d\n", linecount);
+			uint32_t n = 1;
+			if (fetchbit(data, bitoffset++) != 0) {
+				n = fetchbits_unsigned(data, bitoffset, 3) + 2;
+				bitoffset += 3;
+			}
+			uint32_t x = 0;
+			fillRect(_cursorX, y, origin_x - _cursorX, n, _TXTBackColor);
+			do {
+				int32_t xsize = width - x;
+				if (xsize > 32) xsize = 32;
+				uint32_t bits = fetchbits_unsigned(data, bitoffset, xsize);
+				//Serial.printf("    multi line %d %d %x\n", n, x, bits);
+				drawFontBits(opaque, bits, xsize, origin_x + x, y, n);
+				bitoffset += xsize;
+				x += xsize;
+			} while (x < width);
 
-		int start_x = (origin_x < _cursorX_origin) ? origin_x : _cursorX_origin; 	
-		if (start_x < 0) start_x = 0;
-		
-		int start_y = (origin_y < _cursorY_origin) ? origin_y : _cursorY_origin; 
-		if (start_y < 0) start_y = 0;
-		int end_x = _cursorX_origin + delta; 
-		if ((origin_x + (int)width) > end_x)
-			end_x = origin_x + (int)width;
-		if (end_x >= _displayclipx2)  end_x = _displayclipx2;	
-		int end_y = _cursorY_origin + font->line_space; 
-		if ((origin_y + (int)height) > end_y)
-			end_y = origin_y + (int)height;
-		if (end_y >= _displayclipy2) end_y = _displayclipy2;	
-		end_x--;	// setup to last one we draw
-		end_y--;
-		int start_x_min = (start_x >= _displayclipx1) ? start_x : _displayclipx1;
-		int start_y_min = (start_y >= _displayclipy1) ? start_y : _displayclipy1;
-
-		// See if anything is in the display area.
-		if((end_x < _displayclipx1) ||(start_x >= _displayclipx2) || (end_y < _displayclipy1) || (start_y >= _displayclipy2)) {
-			_cursorX += delta;	// could use goto or another indent level...
-		 	//return;
+			if ((width+xoffset) < delta) {
+				fillRect(origin_x + x, y, delta - (width+xoffset), n, _TXTBackColor);
+			}
+			y += n;
+			linecount -= n;
+			//if (++loopcount > 100) {
+				//Serial.println("     abort draw loop");
+				//break;
+			//}
 		}
-/*
-		Serial.printf("drawFontChar(%c) %d\n", c, c);
-		Serial.printf("  size =   %d,%d\n", width, height);
-		Serial.printf("  line space = %d\n", font->line_space);
-		Serial.printf("  offset = %d,%d\n", xoffset, yoffset);
-		Serial.printf("  delta =  %d\n", delta);
-		Serial.printf("  cursor = %d,%d\n", _cursorX, _cursorY);
-		Serial.printf("  origin = %d,%d\n", origin_x, origin_y);
-
-		Serial.printf("  Bounding: (%d, %d)-(%d, %d)\n", start_x, start_y, end_x, end_y);
-		Serial.printf("  mins (%d %d),\n", start_x_min, start_y_min);
-*/
-			_startSend();
-			//Serial.printf("SetAddr %d %d %d %d\n", start_x_min, start_y_min, end_x, end_y);
-			// output rectangle we are updating... We have already clipped end_x/y, but not yet start_x/y
-			setActiveWindow( start_x_min, start_y_min, end_x, end_y);
-			
-			//writecommand_cont(ILI9488_RAMWR);
-			//writeCommand(RA8875_MRWC);
-			int screen_y = start_y_min;
-			int screen_x;
-			while (screen_y < origin_y) {
-				for (screen_x = start_x_min; screen_x <= end_x; screen_x++) {
-					drawPixel(screen_x, screen_y, _TXTBackColor);
-				}
-				screen_y++;
-			}
-
-			// Now lets process each of the data lines. 
-			screen_y = origin_y;
-			while (linecount > 0) {
-				//Serial.printf("    linecount = %d\n", linecount);
-				uint32_t b = fetchbit(data, bitoffset++);
-				uint32_t n;
-				if (b == 0) {
-					//Serial.println("    Single");
-					n = 1;
-				} else {
-					//Serial.println("    Multi");
-					n = fetchbits_unsigned(data, bitoffset, 3) + 2;
-					bitoffset += 3;
-				}
-				uint32_t bitoffset_row_start = bitoffset;
-				while (n--) {
-					// do some clipping here. 
-					bitoffset = bitoffset_row_start;	// we will work through these bits maybe multiple times
-					// We need to handle case where some of the bits may not be visible, but we still need to
-					// read through them
-					//Serial.printf("y:%d  %d %d %d %d\n", screen_y, start_x, origin_x, _displayclipx1, _displayclipx2);
-					if ((screen_y >= _displayclipy1) && (screen_y < _displayclipy2)) {
-						for (screen_x = start_x; screen_x < origin_x; screen_x++) {
-							if ((screen_x >= _displayclipx1) && (screen_x < _displayclipx2)) {
-								//Serial.write('-');
-								drawPixel(screen_x, screen_y, _TXTBackColor);
-							}
-						}
-					}	
-					uint32_t x = 0;
-					screen_x = origin_x;
-					do {
-						uint32_t xsize = width - x;
-						if (xsize > 32) xsize = 32;
-						uint32_t bits = fetchbits_unsigned(data, bitoffset, xsize);
-						uint32_t bit_mask = 1 << (xsize-1);
-						//Serial.printf("     %d %d %x %x - ", x, xsize, bits, bit_mask);
-						if ((screen_y >= _displayclipy1) && (screen_y < _displayclipy2)) {
-							while (bit_mask) {
-								if ((screen_x >= _displayclipx1) && (screen_x < _displayclipx2)) {
-									drawPixel(screen_x,screen_y,(bits & bit_mask) ? _TXTForeColor : _TXTBackColor);
-									//Serial.write((bits & bit_mask) ? '*' : '.');
-								}
-								bit_mask = bit_mask >> 1;
-								screen_x++ ; // Current actual screen X
-							}
-							//Serial.println();
-							bitoffset += xsize;
-						}
-						x += xsize;
-					} while (x < width) ;
-					if ((screen_y >= _displayclipy1) && (screen_y < _displayclipy2)) {
-						// output bg color and right hand side
-						while (screen_x++ <= end_x) {
-							drawPixel(screen_x,screen_y,_TXTBackColor);
-							//Serial.write('+');
-						}
-						//Serial.println();
-					}
-		 			screen_y++;
-					linecount--;
-				}
-			}
-
-			// clear below character - note reusing xcreen_x for this
-			screen_x = (end_y + 1 - screen_y) * (end_x + 1 - start_x_min); // How many bytes we need to still output
-			//Serial.printf("Clear Below: %d\n", screen_x);
-			while (screen_x-- > 1) {
-				drawPixel(screen_x,screen_y,_TXTBackColor);
-			}
-			drawPixel(screen_x,screen_y,_TXTBackColor);
-			_endSend();
-			setActiveWindow();
-
+		fillRect(_cursorX, y, delta, _cursorY + font->line_space - y, _TXTBackColor);
 	}
 	// Increment to setup for the next character.
 	_cursorX += delta;
