@@ -6136,7 +6136,7 @@ void RA8875::drawChar(int16_t x, int16_t y, unsigned char c,
 	}
 }
 
-void RA8875::setFont(const ILI9488_t3_font_t &f) {
+void RA8875::setFont(const ILI9341_t3_font_t &f) {
 	_use_default = 0;
 	if(_portrait && !_use_gfx_font) {
 		_cursorY += _cursorX;

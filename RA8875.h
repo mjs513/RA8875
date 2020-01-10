@@ -209,7 +209,7 @@ typedef struct {
 	unsigned char bits_delta;
 	unsigned char line_space;
 	unsigned char cap_height;
-} ILI9488_t3_font_t;
+} ILI9341_t3_font_t;
 
 // Lets see about supporting Adafruit fonts as well?
 #ifndef _GFXFONT_H_
@@ -351,7 +351,7 @@ class RA8875 : public Print
 		setActiveWindow();
 		_textPosition(_cursorX, _cursorY, false);
 		};
-	void setFont(const ILI9488_t3_font_t &f);
+	void setFont(const ILI9341_t3_font_t &f);
     void setFont(const GFXfont *f = NULL);
 	void setFontAdafruit(void) { setFont(); }
 	void drawFontChar(unsigned int c);
@@ -592,7 +592,7 @@ using Print::write;
  protected:
  	uint32_t textcolorPrexpanded, textbgcolorPrexpanded;
 	boolean wrap; // If set, 'wrap' text at right edge of display
-	const ILI9488_t3_font_t *font;
+	const ILI9341_t3_font_t *font;
 	
 	int16_t  _clipx1, _clipy1, _clipx2, _clipy2;
 	int16_t  _originx, _originy;
