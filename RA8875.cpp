@@ -6748,7 +6748,7 @@ void RA8875::drawGFXFontChar(unsigned int c) {
 			}
 	    }
     	_gfx_last_char_x_write = 0;
-		} else {
+	} else {
 		// To Do, properly clipping and offsetting...
 		// This solid background approach is about 5 time faster
 		// Lets calculate bounding rectangle that we will update
@@ -6792,91 +6792,94 @@ void RA8875::drawGFXFontChar(unsigned int c) {
 		// If we get here and 
 		if (_gfx_last__cursorY != (_cursorY + _originy))  _gfx_last_char_x_write = 0;
 
-			// lets try to output text in one output rectangle
-			//Serial.printf("    SPI (%d %d) (%d %d)\n", x_start, y_start, x_end, y_end);Serial.flush();
-			// compute the actual region we will output given 
-			_startSend();
-		
-			setActiveWindow((x_start >= _displayclipx1) ? x_start : _displayclipx1, 
-					(y_start >= _displayclipy1) ? y_start : _displayclipy1, 
-					x_end  - 1,  y_end - 1); 
-			writeCommand(RA8875_MRWC);
-			//Serial.printf("SetAddr: %u %u %u %u\n", (x_start >= _displayclipx1) ? x_start : _displayclipx1, 
-			//		(y_start >= _displayclipy1) ? y_start : _displayclipy1, 
-			//		x_end  - 1,  y_end - 1); 
-			// First lets fill in the top parts above the actual rectangle...
-			//Serial.printf("    y_top_fill %d x_left_fill %d\n", y_top_fill, x_left_fill);
-			while (y_top_fill--) {
-				if ( (y >= _displayclipy1) && (y < _displayclipy2)) {
-					for (int16_t xx = x_start; xx < x_end; xx++) {
-						if (xx >= _displayclipx1) {
-							drawPixel(xx, y, gfxFontLastCharPosFG(xx,y)? _gfx_last_char_textcolor : (xx < x_offset_cursor)? _gfx_last_char_textbgcolor : _TXTBackColor);
-						}
-					}					
-				}
-				y++;
+		// lets try to output text in one output rectangle
+		//Serial.printf("    SPI (%d %d) (%d %d)\n", x_start, y_start, x_end, y_end);Serial.flush();
+		// compute the actual region we will output given 
+		_startSend();
+	
+		//setActiveWindow((x_start >= _displayclipx1) ? x_start : _displayclipx1, 
+		//		(y_start >= _displayclipy1) ? y_start : _displayclipy1, 
+		//		x_end  - 1,  y_end - 1); 
+		//writeCommand(RA8875_MRWC);
+		//Serial.printf("SetAddr: %u %u %u %u\n", (x_start >= _displayclipx1) ? x_start : _displayclipx1, 
+		//		(y_start >= _displayclipy1) ? y_start : _displayclipy1, 
+		//		x_end  - 1,  y_end - 1); 
+		// First lets fill in the top parts above the actual rectangle...
+		//Serial.printf("    y_top_fill %d x_left_fill %d\n", y_top_fill, x_left_fill);
+		while (y_top_fill--) {
+			if ( (y >= _displayclipy1) && (y < _displayclipy2)) {
+				for (int16_t xx = x_start; xx < x_end; xx++) {
+					if (xx >= _displayclipx1) {
+						combineAndDrawPixel(xx, y, gfxFontLastCharPosFG(xx,y)? _gfx_last_char_textcolor : (xx < x_offset_cursor)? _gfx_last_char_textbgcolor : _TXTBackColor);
+					}
+				}					
 			}
-			//Serial.println("    After top fill"); Serial.flush();
-			// Now lets output all of the pixels for each of the rows.. 
-			for(yy=0; (yy<h) && (y < _displayclipy2); yy++) {
-				uint16_t bo_save = bo;
-				uint8_t bit_save = bit;
-				uint8_t bits_save = bits;
-				for (uint8_t yts = 0; (yts < textsize_y) && (y < _displayclipy2); yts++) {
-					// need to repeat the stuff for each row...
-					bo = bo_save;
-					bit = bit_save;
-					bits = bits_save;
-					x = x_start;
-					if (y >= _displayclipy1) {
-						while (x < x_left_fill) {
-							if ( (x >= _displayclipx1) && (x < _displayclipx2)) {
-								// Don't need to check if we are in previous char as in this case x_left_fill is set to 0...
-								drawPixel(x, y, gfxFontLastCharPosFG(x,y)? _gfx_last_char_textcolor :  _TXTBackColor);
-							}
-							x++;
-						}
-				        for(xx=0; xx<w; xx++) {
-				            if(!(bit++ & 7)) {
-				                bits = bitmap[bo++];
-				            }
-				            for (uint8_t xts = 0; xts < textsize_x; xts++) {
-								if ( (x >= _displayclipx1) && (x < _displayclipx2)) {
-									if (bits & 0x80) 
-										drawPixel(x, y, _TXTForeColor); 
-									else  
-										drawPixel(x, y,gfxFontLastCharPosFG(x,y)? _gfx_last_char_textcolor : (x < x_offset_cursor)? _gfx_last_char_textbgcolor : _TXTBackColor);		
-								}
-				            	x++;	// remember our logical position...
-				            }
-				            bits <<= 1;
-				        }
-				        // Fill in any additional bg colors to right of our output
-				        while (x < x_end) {
-							if (x >= _displayclipx1) {
-				        		drawPixel(x, y, gfxFontLastCharPosFG(x,y)? _gfx_last_char_textcolor : (x < x_offset_cursor)? _gfx_last_char_textbgcolor : _TXTBackColor);
-				        	}
-				        	x++;
-				        }
-			    	}
-		        	y++;	// remember which row we just output
-			    }
-		    }
-		    // And output any more rows below us...
-		    //Serial.println("    Bottom fill"); Serial.flush();
-			while (y < y_end) {
+			forceCombinedPixelsOut();
+			y++;
+		}
+		//Serial.println("    After top fill"); Serial.flush();
+		// Now lets output all of the pixels for each of the rows.. 
+		for(yy=0; (yy<h) && (y < _displayclipy2); yy++) {
+			uint16_t bo_save = bo;
+			uint8_t bit_save = bit;
+			uint8_t bits_save = bits;
+			for (uint8_t yts = 0; (yts < textsize_y) && (y < _displayclipy2); yts++) {
+				// need to repeat the stuff for each row...
+				bo = bo_save;
+				bit = bit_save;
+				bits = bits_save;
+				x = x_start;
 				if (y >= _displayclipy1) {
-					for (int16_t xx = x_start; xx < x_end; xx++) {
-						if (xx >= _displayclipx1)  {
-							drawPixel(xx ,y, gfxFontLastCharPosFG(xx,y)? _gfx_last_char_textcolor : (xx < x_offset_cursor)? _gfx_last_char_textbgcolor : _TXTBackColor);
+					while (x < x_left_fill) {
+						if ( (x >= _displayclipx1) && (x < _displayclipx2)) {
+							// Don't need to check if we are in previous char as in this case x_left_fill is set to 0...
+							combineAndDrawPixel(x, y, gfxFontLastCharPosFG(x,y)? _gfx_last_char_textcolor :  _TXTBackColor);
 						}
+						x++;
+					}
+			        for(xx=0; xx<w; xx++) {
+			            if(!(bit++ & 7)) {
+			                bits = bitmap[bo++];
+			            }
+			            for (uint8_t xts = 0; xts < textsize_x; xts++) {
+							if ( (x >= _displayclipx1) && (x < _displayclipx2)) {
+								if (bits & 0x80) 
+									combineAndDrawPixel(x, y, _TXTForeColor); 
+								else  
+									combineAndDrawPixel(x, y,gfxFontLastCharPosFG(x,y)? _gfx_last_char_textcolor : (x < x_offset_cursor)? _gfx_last_char_textbgcolor : _TXTBackColor);		
+							}
+			            	x++;	// remember our logical position...
+			            }
+			            bits <<= 1;
+			        }
+			        // Fill in any additional bg colors to right of our output
+			        while (x < x_end) {
+						if (x >= _displayclipx1) {
+			        		combineAndDrawPixel(x, y, gfxFontLastCharPosFG(x,y)? _gfx_last_char_textcolor : (x < x_offset_cursor)? _gfx_last_char_textbgcolor : _TXTBackColor);
+			        	}
+			        	x++;
+			        }
+		    	}
+				forceCombinedPixelsOut();
+	        	y++;	// remember which row we just output
+		    }
+	    }
+	    // And output any more rows below us...
+	  	//Serial.println("    Bottom fill"); Serial.flush();
+		while (y < y_end) {
+			if (y >= _displayclipy1) {
+				for (int16_t xx = x_start; xx < x_end; xx++) {
+					if (xx >= _displayclipx1)  {
+						combineAndDrawPixel(xx ,y, gfxFontLastCharPosFG(xx,y)? _gfx_last_char_textcolor : (xx < x_offset_cursor)? _gfx_last_char_textbgcolor : _TXTBackColor);
 					}
 				}
-				y++;
 			}
-			//writecommand_last(ILI9488_NOP);
-			_endSend();
-		setActiveWindow();
+			forceCombinedPixelsOut();
+			y++;
+		}
+		//writecommand_last(ILI9488_NOP);
+		//_endSend();
+		//setActiveWindow();
 
 		_gfx_c_last = c; 
 		_gfx_last__cursorX = _cursorX + _originx;  

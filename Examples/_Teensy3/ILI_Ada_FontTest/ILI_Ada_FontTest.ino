@@ -123,5 +123,13 @@ uint32_t displayStuff()
   tft.println("abcdefghijklmnopqrstuvwxyz");
   tft.println("0123456789");
   tft.println("!@#$%^ &*()-");
-  return (uint32_t) elapsed_time;
+  uint32_t return_value = elapsed_time;
+  if (Serial.available()) {
+    while (Serial.read() != -1) ;
+    Serial.println("Test Paused");
+    delay(50);
+    while (Serial.read() == -1) ;
+    while (Serial.read() != -1) ;
+  }
+  return (uint32_t) return_value;
 }
