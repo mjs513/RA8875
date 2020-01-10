@@ -377,6 +377,30 @@ class RA8875 : public Print
 	void drawFontPixel( uint8_t alpha, uint32_t x, uint32_t y );
 
 	void write16BitColor(uint16_t color, bool last_pixel=false);
+
+	// Hack to see about combining outputs for speed.
+	int16_t _combine_x_start = 0;
+	int16_t _combine_y = 0;
+	int16_t _combine_count = 0;
+	uint16_t _combine_color = 0;
+
+	inline void combineAndDrawPixel(int16_t x, int16_t y, uint16_t color) {
+		if (_combine_count && (color == _combine_color)) _combine_count++;
+		else {
+			if (_combine_count)drawLine(_combine_x_start, _combine_y, _combine_x_start+_combine_count-1, _combine_y, _combine_color);
+			_combine_x_start = x;
+			_combine_y = y;
+			_combine_count = 1;
+			_combine_color = color;
+		}
+	}
+
+	inline void forceCombinedPixelsOut() {
+		if (_combine_count)fillRect(_combine_x_start, _combine_y, _combine_count, 1, _combine_color);
+		_combine_count = 0;
+	}
+
+
 //-------------- AREA ----------------------------------------------------------------------
 	void		setActiveWindow(int16_t XL,int16_t XR,int16_t YT,int16_t YB);//The working area where to draw on
 	void		setActiveWindow(void);
