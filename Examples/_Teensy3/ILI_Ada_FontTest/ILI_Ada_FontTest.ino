@@ -9,6 +9,8 @@
 #define RA8875_CS 9
 #define RA8875_RST 8
 RA8875 tft = RA8875(RA8875_CS, RA8875_RST);
+uint8_t test_screen_rotation = 0;
+
 
 void setup() {
   Serial.begin(38400);
@@ -54,8 +56,72 @@ void setup() {
   tft.println("This is default font:");
   tft.setFontSpacing(1);//now give 5 pix extra spacing between chars
   tft.println("ABCDEF 1 2 3 4 5 6 7");
-
 }
 
 void loop()
-{  }
+{
+  uint32_t delta_time;
+  Serial.println("Press anykey to start speed test");
+  while (Serial.read() == -1) ;
+  while (Serial.read() != -1) ;
+
+  Serial.printf("\nSpeed test at rotation: %d\n", test_screen_rotation);
+  tft.setRotation(test_screen_rotation);
+  test_screen_rotation = (test_screen_rotation + 1) & 0x3;
+
+  tft.fillWindow(RA8875_GREEN);
+  tft.setCursor(0, 0);
+  tft.setTextColor(RA8875_WHITE, RA8875_BLUE);
+  tft.setFont(ComicSansMS_12);
+  tft.println("Opaque font ComicSansMS_12");
+  tft.println();
+  delta_time = displayStuff();
+  Serial.printf("Opaque font ComicSansMS_12: %u\n", delta_time);
+  delay(1000);
+
+  tft.fillWindow(RA8875_YELLOW);
+  tft.setCursor(0, 0);
+  tft.setTextColor(RA8875_RED);
+  tft.println("Transparent ComicSansMS_12");
+  tft.println();
+  delta_time = displayStuff();
+  Serial.printf("Transparent ComicSansMS_12: %u\n", delta_time);
+  delay(1000);
+
+  tft.setFont(&FreeSansOblique12pt7b);
+  tft.fillWindow(RA8875_BLUE);
+  tft.setCursor(0, 0);
+  tft.setTextColor(RA8875_WHITE, RA8875_RED);
+  tft.println("Opaquefont FreeSansOblique12pt7b");
+  tft.println();
+  delta_time = displayStuff();
+  Serial.printf("Opaquefont FreeSansOblique12pt7b: %u\n",  delta_time);
+  delay(1000);
+
+  tft.fillWindow(RA8875_PINK);
+  tft.setCursor(0, 0);
+  tft.setTextColor(RA8875_BLACK);
+  tft.println("Transparent FreeSansOblique12pt7b");
+  tft.println();
+  delta_time = displayStuff();
+  Serial.printf("Transparent FreeSansOblique12pt7b: %u\n",  delta_time);
+  delay(1000);
+  tft.fillWindow(RA8875_GREEN);
+  tft.setCursor(0, 5);
+  tft.setTextColor(RA8875_WHITE, RA8875_BLUE);
+  tft.setFont(ComicSansMS_20);
+  tft.println("Opaque font ComicSansMS_20");
+  tft.println();
+  delta_time = displayStuff();
+  Serial.printf("Opaque font ComicSansMS_20: %u\n", delta_time);
+}
+
+uint32_t displayStuff()
+{
+  elapsedMillis elapsed_time = 0;
+  tft.println("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+  tft.println("abcdefghijklmnopqrstuvwxyz");
+  tft.println("0123456789");
+  tft.println("!@#$%^ &*()-");
+  return (uint32_t) elapsed_time;
+}
