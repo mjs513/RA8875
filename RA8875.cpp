@@ -6461,12 +6461,8 @@ void RA8875::drawFontChar(unsigned int c)
 				linecount--;
 			}
 			
-			// clear below character - note reusing xcreen_x for this
-			//screen_x = (end_y + 1 - screen_y) * (end_x + 1 - start_x_min); // How many bytes we need to still output
-			//Serial.printf("Clear Below: %d\n", screen_x);
-			//while (screen_x-- > 1) {
-			//	drawPixel(screen_x, screen_y, _TXTBackColor);
-			//}
+			// clear below character
+			setActiveWindow();  //have to do this otherwise it gets clipped
 			fillRect(_cursorX, screen_y, delta, _cursorY + font->line_space - screen_y, _TXTBackColor);
 
 		} // anti-aliased
