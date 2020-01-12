@@ -6411,7 +6411,7 @@ void RA8875::drawFontChar(unsigned int c)
 			Serial.printf("  line space = %d\n", font->line_space);
 			Serial.printf("  offset = %d,%d\n", xoffset, yoffset);
 			Serial.printf("  delta =  %d\n", delta);
-			Serial.printf("  cursor = %d,%d\n", cursor_x, cursor_y);
+			Serial.printf("  cursor = %d,%d\n", _cursorX, _cursorY);
 			Serial.printf("  origin = %d,%d\n", origin_x, origin_y);
 
 			Serial.printf("  Bounding: (%d, %d)-(%d, %d)\n", start_x, start_y, end_x, end_y);
@@ -6462,11 +6462,12 @@ void RA8875::drawFontChar(unsigned int c)
 			}
 			
 			// clear below character - note reusing xcreen_x for this
-			screen_x = (end_y + 1 - screen_y) * (end_x + 1 - start_x_min); // How many bytes we need to still output
+			//screen_x = (end_y + 1 - screen_y) * (end_x + 1 - start_x_min); // How many bytes we need to still output
 			//Serial.printf("Clear Below: %d\n", screen_x);
-			while (screen_x-- > 1) {
-				//drawPixel(screen_x, screen_y, _TXTBackColor);
-			}
+			//while (screen_x-- > 1) {
+			//	drawPixel(screen_x, screen_y, _TXTBackColor);
+			//}
+			fillRect(_cursorX, screen_y, delta, _cursorY + font->line_space - screen_y, _TXTBackColor);
 
 		} // anti-aliased
 
