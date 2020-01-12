@@ -1682,6 +1682,12 @@ void RA8875::setCursorBlinkRate(uint8_t rate)
 /**************************************************************************/
 void RA8875::setTextColor(uint16_t fcolor, uint16_t bcolor)//0.69b30
 {
+	if(_use_ili_font){
+	  //for anti-alias font only
+	  // pre-expand colors for fast alpha-blending later
+	  textcolorPrexpanded = (fcolor | (fcolor << 16)) & 0b00000111111000001111100000011111;
+	  textbgcolorPrexpanded = (bcolor | (bcolor << 16)) & 0b00000111111000001111100000011111;
+	}  
 	#if defined(USE_RA8875_SEPARATE_TEXT_COLOR)
 		if (fcolor != _TXTForeColor) {
 			_TXTForeColor = fcolor;
@@ -6136,7 +6142,7 @@ void RA8875::drawChar(int16_t x, int16_t y, unsigned char c,
 	}
 }
 
-void RA8875::setFont(const ILI9488_t3_font_t &f) {
+void RA8875::setFont(const ILI9341_t3_font_t &f) {
 	_use_default = 0;
 	if(_portrait && !_use_gfx_font) {
 		_cursorY += _cursorX;
@@ -6151,10 +6157,17 @@ void RA8875::setFont(const ILI9488_t3_font_t &f) {
         _cursorY -= 6;
 		gfxFont = NULL;
 	}
+	fontbpp = 1;
 	// Calculate additional metrics for Anti-Aliased font support (BDF extn v2.3)
-
+	if (font && font->version==23){
+		fontbpp = (font->reserved & 0b000011)+1;
+		fontbppindex = (fontbpp >> 2)+1;
+		fontbppmask = (1 << (fontbppindex+1))-1;
+		fontppb = 8/fontbpp;
+		fontalphamx = 31/((1<<fontbpp)-1);
 		// Ensure text and bg color are different. Note: use setTextColor to set actual bg color
-		if (_TXTForeColor == _TXTBackColor) _TXTBackColor = (_TXTForeColor==0x0000)?0xFFFF:0x0000;
+		if (textcolor == textbgcolor) textbgcolor = (textcolor==0x0000)?0xFFFF:0x0000;
+	}
 
 }
 
@@ -6303,33 +6316,141 @@ void RA8875::drawFontChar(unsigned int c)
 
 	// Going to try a fast Opaque method which works similar to drawChar, which is near the speed of writerect
 	if (!opaque) {
-		while (linecount > 0) {
-			//Serial.printf("    linecount = %d\n", linecount);
-			uint32_t n = 1;
-			if (fetchbit(data, bitoffset++) != 0) {
-				n = fetchbits_unsigned(data, bitoffset, 3) + 2;
-				bitoffset += 3;
+		// Anti-alias support
+		if (fontbpp>1){
+			// This branch should, in most cases, never happen. This is because if an
+			// anti-aliased font is being used, textcolor and textbgcolor should always
+			// be different. Even though an anti-alised font is being used, pixels in this
+			// case will all be solid because pixels are rendered on same colour as themselves!
+			// This won't look very good.
+			bitoffset = ((bitoffset + 7) & (-8)); // byte-boundary
+			uint32_t xp = 0;
+			uint8_t halfalpha = 1<<(fontbpp-1);
+			while (linecount) {
+				uint32_t x = 0;
+				while(x<width) {
+					// One pixel at a time, either on (if alpha > 0.5) or off
+					if (fetchpixel(data, bitoffset, xp)>=halfalpha){
+						Pixel(origin_x + x,y, _TXTForeColor);
+					}
+					bitoffset += fontbpp;
+					x++;
+					xp++;
+				}
+				y++;
+				linecount--;
 			}
-			uint32_t x = 0;
-			do {
-				int32_t xsize = width - x;
-				if (xsize > 32) xsize = 32;
-				uint32_t bits = fetchbits_unsigned(data, bitoffset, xsize);
-				//Serial.printf("    multi line %d %d %x\n", n, x, bits);
-				drawFontBits(opaque, bits, xsize, origin_x + x, y, n);
-				bitoffset += xsize;
-				x += xsize;
-			} while (x < width);
+		}
+		// Soild pixels
+		else {
+			while (linecount > 0) {
+				//Serial.printf("    linecount = %d\n", linecount);
+				uint32_t n = 1;
+				if (fetchbit(data, bitoffset++) != 0) {
+					n = fetchbits_unsigned(data, bitoffset, 3) + 2;
+					bitoffset += 3;
+				}
+				uint32_t x = 0;
+				do {
+					int32_t xsize = width - x;
+					if (xsize > 32) xsize = 32;
+					uint32_t bits = fetchbits_unsigned(data, bitoffset, xsize);
+					//Serial.printf("    multi line %d %d %x\n", n, x, bits);
+					drawFontBits(opaque, bits, xsize, origin_x + x, y, n);
+					bitoffset += xsize;
+					x += xsize;
+				} while (x < width);
 
 
-			y += n;
-			linecount -= n;
-			//if (++loopcount > 100) {
-				//Serial.println("     abort draw loop");
-				//break;
-			//}
+				y += n;
+				linecount -= n;
+				//if (++loopcount > 100) {
+					//Serial.println("     abort draw loop");
+					//break;
+				//}
+			}
 		}
 	} else {
+		if (fontbpp>1){
+			// Now opaque mode... 
+			// Now write out background color for the number of rows above the above the character
+			// figure out bounding rectangle... 
+			// In this mode we need to update to use the offset and bounding rectangles as we are doing it it direct.
+			// also update the Origin 
+			int cursor_x_origin = _cursorX + _originx;
+			int cursor_y_origin = _cursorY + _originy;
+			_cursorX += _originx;
+			_cursorY += _originy;
+
+			int start_x = (origin_x < cursor_x_origin) ? origin_x : cursor_x_origin; 	
+			if (start_x < 0) start_x = 0;
+			
+			int start_y = (origin_y < cursor_y_origin) ? origin_y : cursor_y_origin; 
+			if (start_y < 0) start_y = 0;
+			int end_x = cursor_x_origin + delta; 
+			if ((origin_x + (int)width) > end_x)
+				end_x = origin_x + (int)width;
+			if (end_x >= _displayclipx2)  end_x = _displayclipx2;	
+			int end_y = cursor_y_origin + font->line_space; 
+			if ((origin_y + (int)height) > end_y)
+				end_y = origin_y + (int)height;
+			if (end_y >= _displayclipy2) end_y = _displayclipy2;	
+			end_x--;	// setup to last one we draw
+			end_y--;
+			int start_x_min = (start_x >= _displayclipx1) ? start_x : _displayclipx1;
+			int start_y_min = (start_y >= _displayclipy1) ? start_y : _displayclipy1;
+
+			// See if anything is in the display area.
+			if((end_x < _displayclipx1) ||(start_x >= _displayclipx2) || (end_y < _displayclipy1) || (start_y >= _displayclipy2)) {
+				_cursorX += delta;	// could use goto or another indent level...
+				return;
+			}
+	/*
+			Serial.printf("drawFontChar(%c) %d\n", c, c);
+			Serial.printf("  size =   %d,%d\n", width, height);
+			Serial.printf("  line space = %d\n", font->line_space);
+			Serial.printf("  offset = %d,%d\n", xoffset, yoffset);
+			Serial.printf("  delta =  %d\n", delta);
+			Serial.printf("  cursor = %d,%d\n", cursor_x, cursor_y);
+			Serial.printf("  origin = %d,%d\n", origin_x, origin_y);
+
+			Serial.printf("  Bounding: (%d, %d)-(%d, %d)\n", start_x, start_y, end_x, end_y);
+			Serial.printf("  mins (%d %d),\n", start_x_min, start_y_min);
+	*/
+		//}
+		// Anti-aliased font
+		int screen_x, screen_y;
+		//if (fontbpp>1){
+			screen_y = origin_y;
+			bitoffset = ((bitoffset + 7) & (-8)); // byte-boundary
+			int glyphend_x = origin_x + width;
+			uint32_t xp = 0;
+			while (linecount) {
+				screen_x = start_x;
+				while(screen_x<=end_x) {
+					// XXX: I'm sure clipping could be done way more efficiently than just chekcing every single pixel, but let's just get this going
+					if ((screen_x >= _displayclipx1) && (screen_x < _displayclipx2) && (screen_y >= _displayclipy1) && (screen_y < _displayclipy2)) {
+						// Clear before or after pixel
+						if ((screen_x<origin_x) || (screen_x>=glyphend_x)){
+							drawPixel(screen_x, screen_y, _TXTBackColor);
+						}
+						// Draw alpha-blended character
+						else{
+							uint8_t alpha = fetchpixel(data, bitoffset, xp);
+							drawPixel(screen_x, screen_y, alphaBlendRGB565Premultiplied( textcolorPrexpanded, textbgcolorPrexpanded, (uint8_t)(alpha * fontalphamx) ) );
+							bitoffset += fontbpp;
+							xp++;
+						}
+					} // clip
+					screen_x++;
+				}
+				screen_y++;
+				linecount--;
+			}
+		} // anti-aliased
+
+		// 1bpp
+		else {
 		// Now opaque mode... 
 		// Now write out background color for the number of rows above the above the character
 		// figure out bounding rectangle... 
@@ -6366,6 +6487,8 @@ void RA8875::drawFontChar(unsigned int c)
 			//}
 		}
 		fillRect(_cursorX, y, delta, _cursorY + font->line_space - y, _TXTBackColor);
+	}
+
 	}
 	// Increment to setup for the next character.
 	_cursorX += delta;
@@ -6931,6 +7054,15 @@ void RA8875::setTextSize(uint8_t s_x, uint8_t s_y) {
 	_gfx_last_char_x_write = 0;	// Don't use cached data here
 }
 
+void RA8875::drawFontPixel( uint8_t alpha, uint32_t x, uint32_t y ){
+	// Adjust alpha based on the number of alpha levels supported by the font (based on bpp)
+	// Note: Implemented look-up table for alpha, but made absolutely no difference in speed (T3.6)
+	alpha = (uint8_t)(alpha * fontalphamx);
+	uint32_t result = ((((textcolorPrexpanded - textbgcolorPrexpanded) * alpha) >> 5) + textbgcolorPrexpanded) & 0b00000111111000001111100000011111;
+	Pixel(x,y,(uint16_t)((result >> 16) | result));
+}
+
+
 void RA8875::Pixel(int16_t x, int16_t y, uint16_t color)
  {
 	x+=_originx;
@@ -6940,7 +7072,7 @@ void RA8875::Pixel(int16_t x, int16_t y, uint16_t color)
 
 	setActiveWindow(x, y, x, y);
 	writeCommand(RA8875_MRWC);
-	write16BitColor(color);
+	drawPixel(x, y, color);
 }
 
 
@@ -6978,6 +7110,16 @@ uint32_t RA8875::fetchbits_signed(const uint8_t *p, uint32_t index, uint32_t req
 		return (int32_t)val - (1 << required);
 	}
 	return (int32_t)val;
+}
+
+uint32_t RA8875::fetchpixel(const uint8_t *p, uint32_t index, uint32_t x)
+{
+	// The byte
+	uint8_t b = p[index >> 3];
+	// Shift to LSB position and mask to get value
+	uint8_t s = ((fontppb-(x % fontppb)-1)*fontbpp);
+	// Mask and return
+	return (b >> s) & fontbppmask;
 }
 
 void RA8875::write16BitColor(uint16_t color, bool last_pixel){

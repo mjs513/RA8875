@@ -190,7 +190,7 @@ CJK-Uni:	\u4E00 -> \u9FD5	/u4E ... /u9F
 
 // Documentation on the ILI9488_t3 font data format:
 // https://forum.pjrc.com/threads/54316-ILI9488_t-font-structure-format
-
+/*
 typedef struct {
 	const unsigned char *index;
 	const unsigned char *unicode;
@@ -209,7 +209,10 @@ typedef struct {
 	unsigned char bits_delta;
 	unsigned char line_space;
 	unsigned char cap_height;
-} ILI9488_t3_font_t;
+} ILI9341_t3_font_t;
+*/
+#include "ILI9341_fonts.h"
+
 
 // Lets see about supporting Adafruit fonts as well?
 #ifndef _GFXFONT_H_
@@ -351,7 +354,7 @@ class RA8875 : public Print
 		setActiveWindow();
 		_textPosition(_cursorX, _cursorY, false);
 		};
-	void setFont(const ILI9488_t3_font_t &f);
+	void setFont(const ILI9341_t3_font_t &f);
     void setFont(const GFXfont *f = NULL);
 	void setFontAdafruit(void) { setFont(); }
 	void drawFontChar(unsigned int c);
@@ -592,7 +595,7 @@ using Print::write;
  protected:
  	uint32_t textcolorPrexpanded, textbgcolorPrexpanded;
 	boolean wrap; // If set, 'wrap' text at right edge of display
-	const ILI9488_t3_font_t *font;
+	const ILI9341_t3_font_t *font;
 	
 	int16_t  _clipx1, _clipy1, _clipx2, _clipy2;
 	int16_t  _originx, _originy;
@@ -706,7 +709,14 @@ using Print::write;
 	uint8_t _use_default = 1;
 	uint8_t textsize, textsize_x, textsize_y;
 	uint16_t textcolor, textbgcolor; 
- 
+	//anti-alias font
+	uint8_t fontbpp = 1;
+	uint8_t fontbppindex = 0;
+	uint8_t fontbppmask = 1;
+	uint8_t fontppb = 8;
+	uint8_t* fontalphalut;
+	float fontalphamx = 1;
+	
 	uint8_t							_rst;
 	uint8_t							_intPin;
 	uint8_t						 	_intNum;
@@ -720,7 +730,40 @@ using Print::write;
 	uint32_t fetchbits_signed(const uint8_t *p, uint32_t index, uint32_t required);
 	void 	 _fontWrite(uint8_t c);
 	
+	/**
+	 * Found in a pull request for the Adafruit framebuffer library. Clever!
+	 * https://github.com/tricorderproject/arducordermini/pull/1/files#diff-d22a481ade4dbb4e41acc4d7c77f683d
+	 * Converts  0000000000000000rrrrrggggggbbbbb
+	 *     into  00000gggggg00000rrrrr000000bbbbb
+	 * with mask 00000111111000001111100000011111
+	 * This is useful because it makes space for a parallel fixed-point multiply
+	 * This implements the linear interpolation formula: result = bg * (1.0 - alpha) + fg * alpha
+	 * This can be factorized into: result = bg + (fg - bg) * alpha
+	 * alpha is in Q1.5 format, so 0.0 is represented by 0, and 1.0 is represented by 32
+	 * @param	fg		Color to draw in RGB565 (16bit)
+	 * @param	bg		Color to draw over in RGB565 (16bit)
+	 * @param	alpha	Alpha in range 0-255
+	 **/
+	uint16_t alphaBlendRGB565( uint32_t fg, uint32_t bg, uint8_t alpha )
+	 __attribute__((always_inline)) {
+	 	alpha = ( alpha + 4 ) >> 3; // from 0-255 to 0-31
+		bg = (bg | (bg << 16)) & 0b00000111111000001111100000011111;
+		fg = (fg | (fg << 16)) & 0b00000111111000001111100000011111;
+		uint32_t result = ((((fg - bg) * alpha) >> 5) + bg) & 0b00000111111000001111100000011111;
+		return (uint16_t)((result >> 16) | result); // contract result
+	}
 	
+	/**
+	 * Same as above, but fg and bg are premultiplied, and alpah is already in range 0-31
+	 */
+	uint16_t alphaBlendRGB565Premultiplied( uint32_t fg, uint32_t bg, uint8_t alpha )
+	 __attribute__((always_inline)) {
+		uint32_t result = ((((fg - bg) * alpha) >> 5) + bg) & 0b00000111111000001111100000011111;
+		return (uint16_t)((result >> 16) | result); // contract result
+	}
+	
+	uint32_t fetchpixel(const uint8_t *p, uint32_t index, uint32_t x);
+
 	// Touch Screen vars ---------------------
 	#if !defined(_AVOID_TOUCHSCREEN)
 	uint8_t						    _maxTouch;//5 on FT5206, 1 on resistive
