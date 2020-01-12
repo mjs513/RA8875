@@ -6166,8 +6166,7 @@ void RA8875::setFont(const ILI9341_t3_font_t &f) {
 		fontppb = 8/fontbpp;
 		fontalphamx = 31/((1<<fontbpp)-1);
 		// Ensure text and bg color are different. Note: use setTextColor to set actual bg color
-		if (textcolor == textbgcolor) textbgcolor = (textcolor==0x0000)?0xFFFF:0x0000;
-	}
+		if (_TXTForeColor == _TXTBackColor) _TXTBackColor = (_TXTForeColor==0x0000)?0xFFFF:0x0000;	}
 
 }
 
@@ -6311,6 +6310,7 @@ void RA8875::drawFontChar(unsigned int c)
 	int32_t linecount = height;
 	//uint32_t loopcount = 0;
 	int32_t y = origin_y;
+	
 	bool opaque = !_backTransparent; //(_TXTBackColor != _TXTForeColor);
 
 
@@ -6370,7 +6370,7 @@ void RA8875::drawFontChar(unsigned int c)
 				//}
 			}
 		}
-	} else {
+	} else {  //Opaque
 		if (fontbpp>1){
 			// Now opaque mode... 
 			// Now write out background color for the number of rows above the above the character
@@ -6405,7 +6405,7 @@ void RA8875::drawFontChar(unsigned int c)
 				_cursorX += delta;	// could use goto or another indent level...
 				return;
 			}
-	/*
+/*
 			Serial.printf("drawFontChar(%c) %d\n", c, c);
 			Serial.printf("  size =   %d,%d\n", width, height);
 			Serial.printf("  line space = %d\n", font->line_space);
@@ -6416,11 +6416,24 @@ void RA8875::drawFontChar(unsigned int c)
 
 			Serial.printf("  Bounding: (%d, %d)-(%d, %d)\n", start_x, start_y, end_x, end_y);
 			Serial.printf("  mins (%d %d),\n", start_x_min, start_y_min);
-	*/
-		//}
-		// Anti-aliased font
-		int screen_x, screen_y;
-		//if (fontbpp>1){
+*/
+			//}
+			// Anti-aliased font
+
+			//Serial.printf("SetAddr %d %d %d %d\n", start_x_min, start_y_min, end_x, end_y);
+			// output rectangle we are updating... We have already clipped end_x/y, but not yet start_x/y
+			setActiveWindow( start_x, start_y_min, end_x, end_y);
+			int screen_y = start_y_min;
+			int screen_x;
+
+			// Clear above character
+			while (screen_y < origin_y) {
+				for (screen_x = start_x_min; screen_x <= end_x; screen_x++) {
+					drawPixel(screen_x, screen_y, _TXTBackColor);
+				}
+				screen_y++;
+			}
+				
 			screen_y = origin_y;
 			bitoffset = ((bitoffset + 7) & (-8)); // byte-boundary
 			int glyphend_x = origin_x + width;
@@ -6447,48 +6460,55 @@ void RA8875::drawFontChar(unsigned int c)
 				screen_y++;
 				linecount--;
 			}
+			
+			// clear below character - note reusing xcreen_x for this
+			screen_x = (end_y + 1 - screen_y) * (end_x + 1 - start_x_min); // How many bytes we need to still output
+			//Serial.printf("Clear Below: %d\n", screen_x);
+			while (screen_x-- > 1) {
+				//drawPixel(screen_x, screen_y, _TXTBackColor);
+			}
+
 		} // anti-aliased
 
 		// 1bpp
 		else {
-		// Now opaque mode... 
-		// Now write out background color for the number of rows above the above the character
-		// figure out bounding rectangle... 
-		// In this mode we need to update to use the offset and bounding rectangles as we are doing it it direct.
-		// also update the Origin 
-		fillRect(_cursorX, _cursorY, delta, y - _cursorY, _TXTBackColor);
-		while (linecount > 0) {
-			//Serial.printf("    linecount = %d\n", linecount);
-			uint32_t n = 1;
-			if (fetchbit(data, bitoffset++) != 0) {
-				n = fetchbits_unsigned(data, bitoffset, 3) + 2;
-				bitoffset += 3;
-			}
-			uint32_t x = 0;
-			fillRect(_cursorX, y, origin_x - _cursorX, n, _TXTBackColor);
-			do {
-				int32_t xsize = width - x;
-				if (xsize > 32) xsize = 32;
-				uint32_t bits = fetchbits_unsigned(data, bitoffset, xsize);
-				//Serial.printf("    multi line %d %d %x\n", n, x, bits);
-				drawFontBits(opaque, bits, xsize, origin_x + x, y, n);
-				bitoffset += xsize;
-				x += xsize;
-			} while (x < width);
+			// Now opaque mode... 
+			// Now write out background color for the number of rows above the above the character
+			// figure out bounding rectangle... 
+			// In this mode we need to update to use the offset and bounding rectangles as we are doing it it direct.
+			// also update the Origin 
+			fillRect(_cursorX, _cursorY, delta, y - _cursorY, _TXTBackColor);
+			while (linecount > 0) {
+				//Serial.printf("    linecount = %d\n", linecount);
+				uint32_t n = 1;
+				if (fetchbit(data, bitoffset++) != 0) {
+					n = fetchbits_unsigned(data, bitoffset, 3) + 2;
+					bitoffset += 3;
+				}
+				uint32_t x = 0;
+				fillRect(_cursorX, y, origin_x - _cursorX, n, _TXTBackColor);
+				do {
+					int32_t xsize = width - x;
+					if (xsize > 32) xsize = 32;
+					uint32_t bits = fetchbits_unsigned(data, bitoffset, xsize);
+					//Serial.printf("    multi line %d %d %x\n", n, x, bits);
+					drawFontBits(opaque, bits, xsize, origin_x + x, y, n);
+					bitoffset += xsize;
+					x += xsize;
+				} while (x < width);
 
-			if ((width+xoffset) < delta) {
-				fillRect(origin_x + x, y, delta - (width+xoffset), n, _TXTBackColor);
+				if ((width+xoffset) < delta) {
+					fillRect(origin_x + x, y, delta - (width+xoffset), n, _TXTBackColor);
+				}
+				y += n;
+				linecount -= n;
+				//if (++loopcount > 100) {
+					//Serial.println("     abort draw loop");
+					//break;
+				//}
 			}
-			y += n;
-			linecount -= n;
-			//if (++loopcount > 100) {
-				//Serial.println("     abort draw loop");
-				//break;
-			//}
+			fillRect(_cursorX, y, delta, _cursorY + font->line_space - y, _TXTBackColor);
 		}
-		fillRect(_cursorX, y, delta, _cursorY + font->line_space - y, _TXTBackColor);
-	}
-
 	}
 	// Increment to setup for the next character.
 	_cursorX += delta;
