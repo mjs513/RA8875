@@ -6079,7 +6079,6 @@ void RA8875::drawChar(int16_t x, int16_t y, unsigned char c,
 		uint8_t xc, yc;
 		uint8_t xr, yr;
 		uint8_t mask = 0x01;
-		uint16_t color;
 
 		// We need to offset by the origin.
 		x+=_originx;
@@ -6112,11 +6111,6 @@ void RA8875::drawChar(int16_t x, int16_t y, unsigned char c,
 					x = x_char_start; 		// get our first x position...
 					if (y >= _displayclipy1) {
 						for (xc=0; xc < 5; xc++) {
-							if (glcdfont[c * 5 + xc] & mask) {
-								color = fgcolor;
-							} else {
-								color = bgcolor;
-							}
 							for (xr=0; xr < size_x; xr++) {
 								if ((x >= _displayclipx1) && (x < _displayclipx2)) {
 									//write16BitColor(fgcolor);
