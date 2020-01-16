@@ -371,6 +371,8 @@ class RA8875 : public Print
 	
 	void charBounds(char c, int16_t *x, int16_t *y,
 		int16_t *minx, int16_t *miny, int16_t *maxx, int16_t *maxy);
+    void getTextBounds(const uint8_t *buffer, uint16_t len, int16_t x, int16_t y,
+      int16_t *x1, int16_t *y1, uint16_t *w, uint16_t *h);
     void getTextBounds(const char *string, int16_t x, int16_t y,
       int16_t *x1, int16_t *y1, uint16_t *w, uint16_t *h);
     void getTextBounds(const String &str, int16_t x, int16_t y,
@@ -580,7 +582,7 @@ class RA8875 : public Print
 //}
 
 virtual size_t write(uint8_t c) {
-	_fontWrite(c);
+	_fontWrite(&c, 1);
 	return 1;
 }
 
@@ -588,8 +590,7 @@ virtual size_t write(const uint8_t *buffer, size_t size){
 	if(_use_default) {
 		_textWrite((const char *)buffer, size);
 	} else {
-		for(uint8_t j = 0; j < size; j++)
-		_fontWrite(buffer[j]);
+		_fontWrite(buffer, size);
 	}
 	return size;
 }
@@ -733,7 +734,7 @@ using Print::write;
 	uint32_t fetchbit(const uint8_t *p, uint32_t index);
 	uint32_t fetchbits_unsigned(const uint8_t *p, uint32_t index, uint32_t required);
 	uint32_t fetchbits_signed(const uint8_t *p, uint32_t index, uint32_t required);
-	void 	 _fontWrite(uint8_t c);
+	void 	 _fontWrite(const uint8_t* buffer, uint16_t len);
 	
 	/**
 	 * Found in a pull request for the Adafruit framebuffer library. Clever!
