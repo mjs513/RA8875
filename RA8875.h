@@ -584,10 +584,15 @@ virtual size_t write(uint8_t c) {
 	return 1;
 }
 
-//virtual size_t write(const uint8_t *buffer, size_t size){
-//	_textWrite((const char *)buffer, size);
-//	return size;
-//}
+virtual size_t write(const uint8_t *buffer, size_t size){
+	if(_use_default) {
+		_textWrite((const char *)buffer, size);
+	} else {
+		for(uint8_t j = 0; j < size; j++)
+		_fontWrite(buffer[j]);
+	}
+	return size;
+}
 
 
 using Print::write;
