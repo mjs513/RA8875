@@ -30,6 +30,15 @@ License:GNU General Public License v3.0
 		#if defined(___DUESTUFF) && defined(USE_DUE_WIRE1_INTERFACE)
 			#define Wire Wire1
 		#endif
+		#if defined(___TEENSYES)
+			#if defined(USE_TEENSY_WIRE1_INTERFACE)
+				#define Wire Wire1
+			#elif defined(USE_TEENSY_WIRE2_INTERFACE)
+				#define Wire Wire2
+			#elif defined(USE_TEENSY_WIRE3_INTERFACE)
+				#define Wire Wire3
+			#endif
+		#endif		
 	#endif
 	const uint8_t _ctpAdrs = 0x38;
 	const uint8_t coordRegStart[5] = {0x03,0x09,0x0F,0x15,0x1B};
@@ -1489,7 +1498,7 @@ void RA8875::setCursor(int16_t x, int16_t y,bool autocenter)
 	_absoluteCenter = autocenter;
 	
 	if (_portrait) {//rotation 1,3
-		swapvals(x,y);
+		if (_use_default) swapvals(x,y);
 		if (y == CENTER) {//swapped OK
 			y = _width/2;
 			if (!autocenter) {
@@ -5929,52 +5938,78 @@ void RA8875::writeCommand(const uint8_t d)
 	_endSend();
 }
 
-void RA8875::_fontWrite(uint8_t c)
+void RA8875::_fontWrite(const uint8_t* buffer, uint16_t len)
 {
 	if(_use_default) {
 		if (_FNTgrandient) _FNTgrandient = false;//cannot use this with write
-		_textWrite((const char *)&c, 1);
+		_textWrite((const char *)buffer, len);
 		//Serial.printf("Default: %c, %d, %d\n", c, _cursorX, _cursorY);
 		return;
 	}
-
-	if (font) {
-		//Serial.printf("ILI: %c, %d, %d\n", c, _cursorX, _cursorY);
-		if (c == '\n') {
-			//_cursorY += font->line_space;
-			//_cursorX  = 0;
-		} else {
-		  if (c == 13) {
-			_cursorY += font->line_space;
-			_cursorX  = 0;
-		  } else {
-			drawFontChar(c);
-		  }
-		}
-	} else if (gfxFont)  {
-		//Serial.printf("GFX: %c, %d, %d\n", c, _cursorX, _cursorY);
-		if (c == '\n') {
-            _cursorY += (int16_t)textsize_y * gfxFont->yAdvance;
-			_cursorX  = 0;
-		} else {
-			drawGFXFontChar(c);
-		}
-	} else {
-		if (c == '\n') {
-			_cursorY += textsize_y*8;
-			_cursorX  = 0;
-		} else if (c == '\r') {
-			// skip em
-		} else {
-			drawChar(_cursorX, _cursorY, c, textcolor, textbgcolor, textsize_x, textsize_y);
-			_cursorX += textsize_x*6;
-			if (wrap && (_cursorX > (_width - textsize_x*6))) {
-				_cursorY += textsize_y*6;
-				_cursorX = 0;
+	// Lets try to handle some of the special font centering code that was done for default fonts.
+	if (_absoluteCenter || _relativeCenter ) {
+		int16_t x, y;
+	  	uint16_t strngWidth, strngHeight;
+	  	getTextBounds(buffer, len, 0, 0, &x, &y, &strngWidth, &strngHeight);
+	  	//Serial.printf("_fontwrite bounds: %d %d %u %u\n", x, y, strngWidth, strngHeight);
+	  	// Note we may want to play with the x ane y returned if they offset some
+		if (_absoluteCenter && strngWidth > 0){//Avoid operations for strngWidth = 0
+			_absoluteCenter = false;
+			_cursorX = _cursorX - ((x + strngWidth) / 2);
+			_cursorY = _cursorY - ((y + strngHeight) / 2);
+		} else if (_relativeCenter && strngWidth > 0){//Avoid operations for strngWidth = 0
+			_relativeCenter = false;
+			if (bitRead(_TXTparameters,5)) {//X = center
+				_cursorX = (_width / 2) - ((x + strngWidth) / 2);
+				_TXTparameters &= ~(1 << 5);//reset
+			}
+			if (bitRead(_TXTparameters,6)) {//Y = center
+				_cursorY = (_height / 2) - ((y + strngHeight) / 2) ;
+				_TXTparameters &= ~(1 << 6);//reset
 			}
 		}
 	}
-	
+
+	while(len) {
+		uint8_t c = *buffer++;
+		if (font) {
+			//Serial.printf("ILI: %c, %d, %d\n", c, _cursorX, _cursorY);
+			if (c == '\n') {
+				//_cursorY += font->line_space;
+				//_cursorX  = 0;
+			} else {
+			  if (c == 13) {
+				_cursorY += font->line_space;
+				_cursorX  = 0;
+			  } else {
+				drawFontChar(c);
+			  }
+			}
+		} else if (gfxFont)  {
+			//Serial.printf("GFX: %c, %d, %d\n", c, _cursorX, _cursorY);
+			if (c == '\n') {
+	            _cursorY += (int16_t)textsize_y * gfxFont->yAdvance;
+				_cursorX  = 0;
+			} else {
+				drawGFXFontChar(c);
+			}
+		} else {
+			if (c == '\n') {
+				_cursorY += textsize_y*8;
+				_cursorX  = 0;
+			} else if (c == '\r') {
+				// skip em
+			} else {
+				drawChar(_cursorX, _cursorY, c, textcolor, textbgcolor, textsize_x, textsize_y);
+				_cursorX += textsize_x*6;
+				if (wrap && (_cursorX > (_width - textsize_x*6))) {
+					_cursorY += textsize_y*6;
+					_cursorX = 0;
+				}
+			}
+		}
+		len--;
+	}
 }
 
 
@@ -6079,7 +6114,6 @@ void RA8875::drawChar(int16_t x, int16_t y, unsigned char c,
 		uint8_t xc, yc;
 		uint8_t xr, yr;
 		uint8_t mask = 0x01;
-		uint16_t color;
 
 		// We need to offset by the origin.
 		x+=_originx;
@@ -6112,11 +6146,6 @@ void RA8875::drawChar(int16_t x, int16_t y, unsigned char c,
 					x = x_char_start; 		// get our first x position...
 					if (y >= _displayclipy1) {
 						for (xc=0; xc < 5; xc++) {
-							if (glcdfont[c * 5 + xc] & mask) {
-								color = fgcolor;
-							} else {
-								color = bgcolor;
-							}
 							for (xr=0; xr < size_x; xr++) {
 								if ((x >= _displayclipx1) && (x < _displayclipx2)) {
 									//write16BitColor(fgcolor);
@@ -6717,6 +6746,28 @@ void RA8875::charBounds(char c, int16_t *x, int16_t *y,
 }
 
 // Add in Adafruit versions of text bounds calculations. 
+void RA8875::getTextBounds(const uint8_t *buffer, uint16_t len, int16_t x, int16_t y,
+      int16_t *x1, int16_t *y1, uint16_t *w, uint16_t *h) {
+    *x1 = x;
+    *y1 = y;
+    *w  = *h = 0;
+
+    int16_t minx = _width, miny = _height, maxx = -1, maxy = -1;
+
+    while(len--)
+        charBounds(*buffer++, &x, &y, &minx, &miny, &maxx, &maxy);
+
+    if(maxx >= minx) {
+        *x1 = minx;
+        *w  = maxx - minx + 1;
+    }
+    if(maxy >= miny) {
+        *y1 = miny;
+        *h  = maxy - miny + 1;
+    }
+
+}
+
 void RA8875::getTextBounds(const char *str, int16_t x, int16_t y,
         int16_t *x1, int16_t *y1, uint16_t *w, uint16_t *h) {
     uint8_t c; // Current character

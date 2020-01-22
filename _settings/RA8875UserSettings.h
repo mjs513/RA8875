@@ -79,6 +79,15 @@ on other CPU!
 
 //#define USE_DUE_WIRE1_INTERFACE//force use Wire1 (only for DUE, no effects on other CPU)
 
+/* [USE ALTERNATIVE I2C/WIRE ON Teensy's]
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Just uncomment one of the line below, this option works only for Arduino TEENSY and has NO effects
+on other CPU!
+*/
+//#define USE_TEENSY_WIRE1_INTERFACE//force use Wire1 (only for DUE, no effects on other CPU)
+//#define USE_TEENSY_WIRE2_INTERFACE//force use Wire2 (only for DUE, no effects on other CPU)
+//#define USE_TEENSY_WIRE3_INTERFACE//force use Wire3 (only for DUE, no effects on other CPU)
+
 /* [Default Interrupt Number for Touchscreen] [RA8875 & FT5206] ++++++++++++++++++++++++++++++++++
 Some microcontroller like Teensy 3,3.1 and LC automatically assign ISR number (since they
 can virtually assign ISR to any pin) but some old one like Arduino UNO have ISR hardcoded */
