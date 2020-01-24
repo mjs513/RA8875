@@ -668,8 +668,11 @@ using Print::write;
 	#if defined(USE_FT5206_TOUCH)
 		volatile bool			  _needCTS_ISRrearm;
 		static void 		 	  cts_isr(void);
+		#if defined(___DUESTUFF) && defined(USE_DUE_WIRE1_INTERFACE)
+		TwoWire 				 *_wire=&Wire1;
+		#else
 		TwoWire 				 *_wire=&Wire;
-
+		#endif
 	#elif defined(USE_RA8875_TOUCH)
 		//volatile bool			  _touchEnabled;
 		//volatile bool			  _clearTInt;

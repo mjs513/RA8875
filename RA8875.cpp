@@ -6127,7 +6127,7 @@ void RA8875::drawChar(int16_t x, int16_t y, unsigned char c,
 			if(y < _displayclipy1) {	h -= (_displayclipy1 - y); y = _displayclipy1; 	}
 			if((y + h - 1) >= _displayclipy2) h = _displayclipy2 - y;
 
-			Serial.printf("%d, %d, %d, %d\n", x, y, x + w -1, y + h - 1);
+			//Serial.printf("%d, %d, %d, %d\n", x, y, x + w -1, y + h - 1);
 			setActiveWindow(x, y, x + w -1, y + h - 1);
 			_startSend();
 			y = y_char_top;	// restore the actual y.
