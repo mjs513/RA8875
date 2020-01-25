@@ -247,6 +247,10 @@ typedef struct {
 #include "_includes/RA8875ColorPresets.h"
 #include "_settings/RA8875UserSettings.h"
 
+#if !defined(_AVOID_TOUCHSCREEN) &&  defined(USE_FT5206_TOUCH)
+#include <Wire.h>
+#endif
+
 #if defined(_FORCE_PROGMEM__) && !defined(ESP8266)
 template <typename T> T PROGMEM_read (const T * sce)
   {
@@ -564,6 +568,7 @@ class RA8875 : public Print
 		boolean		touchCalibrated(void);//true if screen calibration it's present
 		void		setTouchCalibrationData(uint16_t minX, uint16_t maxX, uint16_t minY, uint16_t maxY);
 	#elif defined (USE_FT5206_TOUCH)
+		void		setWireObject(TwoWire *wire) {_wire = wire; }
 		void		useCapINT(const uint8_t INTpin=2,const uint8_t INTnum=0);
 		void 		enableCapISR(bool force = false); 
 		void	 	updateTS(void);
@@ -663,6 +668,11 @@ using Print::write;
 	#if defined(USE_FT5206_TOUCH)
 		volatile bool			  _needCTS_ISRrearm;
 		static void 		 	  cts_isr(void);
+		#if defined(___DUESTUFF) && defined(USE_DUE_WIRE1_INTERFACE)
+		TwoWire 				 *_wire=&Wire1;
+		#else
+		TwoWire 				 *_wire=&Wire;
+		#endif
 	#elif defined(USE_RA8875_TOUCH)
 		//volatile bool			  _touchEnabled;
 		//volatile bool			  _clearTInt;

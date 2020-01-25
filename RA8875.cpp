@@ -569,9 +569,9 @@ void RA8875::begin(const enum RA8875sizes s,uint8_t colors, uint32_t SPIMaxSpeed
 	_initialize();//----->Time to Initialize the RA8875!
 	//------- time for capacitive touch stuff -----------------
 	#if defined(USE_FT5206_TOUCH)
-		Wire.begin();
+		_wire->begin();
 		#if defined(___DUESTUFF)
-			Wire.setClock(400000UL); // Set I2C frequency to 400kHz
+			_wire->setClock(400000UL); // Set I2C frequency to 400kHz
 			/*
 			#if !defined(USE_DUE_WIRE1_INTERFACE)//sorry but I do not own a DUE, have to learn about Wire1
 			// Force 400 KHz I2C, rawr! (Uses pins 20, 21 for SDA, SCL)
@@ -582,7 +582,7 @@ void RA8875::begin(const enum RA8875sizes s,uint8_t colors, uint32_t SPIMaxSpeed
 		#else
 			//TODO, Dunno what to do here with SPARK
 			#if ARDUINO >= 157
-				Wire.setClock(400000UL); // Set I2C frequency to 400kHz
+				_wire->setClock(400000UL); // Set I2C frequency to 400kHz
 			#else
 				TWBR = ((F_CPU / 400000UL) - 16) / 2; // Set I2C frequency to 400kHz
 			#endif
@@ -5320,7 +5320,7 @@ uint8_t RA8875::getTouchLimit(void)
 void RA8875::_initializeFT5206(void)
 {
 	uint8_t i;
-	for (i=0x80;i<=0x89;i++){
+	for (i=0x80;i<0x89;i++){
 		_sendRegFT5206(i,_FT5206REgisters[i-0x80]);
 	}
 	_sendRegFT5206(0x00,0x00);//Device Mode
@@ -5338,10 +5338,10 @@ void RA8875::_sendRegFT5206(uint8_t reg,const uint8_t val)
 		uint8_t twbrbackup = TWBR;
 		TWBR = 12; // upgrade to 400KHz!
 	#endif
-	Wire.beginTransmission(_ctpAdrs);
-	Wire.write(reg);
-	Wire.write(val);
-	Wire.endTransmission(_ctpAdrs);
+	_wire->beginTransmission(_ctpAdrs);
+	_wire->write(reg);
+	_wire->write(val);
+	_wire->endTransmission(_ctpAdrs);
 	#if !defined(___DUESTUFF)
 		TWBR = twbrbackup;
 	#endif
@@ -5356,10 +5356,10 @@ void RA8875::_sendRegFT5206(uint8_t reg,const uint8_t val)
 /**************************************************************************/
 void RA8875::updateTS(void)
 {
-    Wire.requestFrom((uint8_t)_ctpAdrs,(uint8_t)31); //get 31 registers
+    _wire->requestFrom((uint8_t)_ctpAdrs,(uint8_t)31); //get 31 registers
     uint8_t index = 0;
-    while(Wire.available()) {
-      _cptRegisters[index++] = Wire.read();//fill registers
+    while(_wire->available()) {
+      _cptRegisters[index++] = _wire->read();//fill registers
     }
 	_currentTouches = _cptRegisters[0x02] & 0xF;
 	if (_currentTouches > _maxTouch) _currentTouches = _maxTouch;
@@ -6127,7 +6127,7 @@ void RA8875::drawChar(int16_t x, int16_t y, unsigned char c,
 			if(y < _displayclipy1) {	h -= (_displayclipy1 - y); y = _displayclipy1; 	}
 			if((y + h - 1) >= _displayclipy2) h = _displayclipy2 - y;
 
-			Serial.printf("%d, %d, %d, %d\n", x, y, x + w -1, y + h - 1);
+			//Serial.printf("%d, %d, %d, %d\n", x, y, x + w -1, y + h - 1);
 			setActiveWindow(x, y, x + w -1, y + h - 1);
 			_startSend();
 			y = y_char_top;	// restore the actual y.
