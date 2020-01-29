@@ -3716,6 +3716,50 @@ void RA8875::fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color
 		_rect_helper(x,y,(x+w)-1,(y+h)-1,color,true);//thanks the experimentalist
 	}
 }
+
+
+/**************************************************************************/
+/*!
+	  write a filled rectangle wither user colors array
+	  Parameters:
+	  x: horizontal start
+	  y: vertical start
+	  w: width
+	  h: height
+	  pcolors: Array of RGB565 color of size w*h
+*/
+/**************************************************************************/
+void RA8875::writeRect(int16_t x, int16_t y, int16_t w, int16_t h, const uint16_t *pcolors)
+{
+	uint16_t start_x = (x != CENTER) ? x : (_width - w) / 2;
+	uint16_t start_y = (y != CENTER) ? y : (_height - h) / 2;
+
+	static uint16_t rotated_row[800]; // max size.
+	bool portrait_mode = isPortrait();
+
+	if (portrait_mode) {
+		pcolors += (w - 1);
+		for (uint16_t x = start_x + w - 1; x >= start_x; x--) {
+			const uint16_t *pimage = pcolors;
+			for (uint16_t i = 0; i < h; i++) {
+				rotated_row[i] = *pimage;
+				pimage += w;
+			}
+			//Serial.printf("DP %x, %d, %d %d\n", rotated_row, h, start_x, y);
+			drawPixels(rotated_row, h, x, start_y);
+			pcolors--;
+		}
+	} else {
+	// now lets draw out each of the lines of the image...
+		for (uint16_t y = start_y; y < (start_y + h); y++) {
+		// tft.setY(y); // Not needed drawPixels calls setXY which will set y...
+			drawPixels((uint16_t*)pcolors, w, start_x, y);
+			pcolors += w;
+		}
+	}
+}
+
+
 /**************************************************************************/
 /*!
 	  calculate a grandient color
