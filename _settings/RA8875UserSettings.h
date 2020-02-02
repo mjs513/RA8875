@@ -185,6 +185,7 @@ DO NOT Exceed 23Mhz for RA8875! It will result in garbage on screen or run very 
 
 #if defined(SPI_HAS_TRANSACTION)
 //SPI transaction enabled library----------------------
+	const static uint32_t MAXSPIREADSPEED  = 6000000UL;  //Read don't go higher than 22000000!;
 	#if defined(__MK20DX128__) || defined(__MK20DX256__)  || defined(__MK64FX512__) || defined(__MK66FX1M0__) || defined(__IMXRT1062__)
 		const static uint32_t MAXSPISPEED	= 18000000UL;  //don't go higher than 22000000!;
 	#elif defined(__MKL26Z64__)							 //[Teensy LC] (12 or 24 Mhz max)
@@ -274,6 +275,9 @@ DO NOT Exceed 23Mhz for RA8875! It will result in garbage on screen or run very 
 #endif
 
 //was here
-
+// Different displays may need/want different _waitPoll timeouts. Example on 800x480 display found drawing large circle took about 57ms which was a lot > 10 default fefore...
+#define _RA8875_WAITPOLL_TIMEOUT_DCR_LINESQUTRI_STATUS 		20		// Have seen 12 or so
+#define _RA8875_WAITPOLL_TIMEOUT_DCR_CIRCLE_STATUS 			75		
+#define _RA8875_WAITPOLL_TIMEOUT_ELLIPSE_STATUS				75
 
 #endif

@@ -286,7 +286,7 @@ class RA8875 : public Print
 		RA8875(const uint8_t CSp, const uint8_t RSTp=255);
 	#endif
 //------------- SETUP -----------------------------------------------------------------------
-	void 		begin(const enum RA8875sizes s,uint8_t colors=16, uint32_t SPIMaxSpeed = (uint32_t)-1 );
+	void 		begin(const enum RA8875sizes s,uint8_t colors=16, uint32_t SPIMaxSpeed = (uint32_t)-1, uint32_t SPIMaxReadSpeed = (uint32_t)-1 );
 	//(RA8875_480x272, RA8875_800x480, Adafruit_480x272, Adafruit_800x480) , (8/16 bit)
 //------------- HARDWARE ------------------------------------------------------------
 	void 		backlight(boolean on);
@@ -683,6 +683,7 @@ using Print::write;
 	#ifdef SPI_HAS_TRANSACTION
 	volatile uint32_t 			_SPITransactionSpeed; //holder for SPI speed
 	uint32_t					_SPIMaxSpeed;         // Max Speed defined in either begin or presets...
+	uint32_t					_SPIMaxReadSpeed;	  // Max Read speed defined in either begin or presets.
 	#endif
 	#if defined(TEENSYDUINO)//all of them (32 bit only)
 		uint8_t 				  _cs;
@@ -1034,7 +1035,7 @@ using Print::write;
 	uint8_t 	_readRegister(const uint8_t reg);
 	void    	_writeData(uint8_t data);
 	uint8_t 	_readData(bool stat=false);
-	boolean 	_waitPoll(uint8_t r, uint8_t f);//from adafruit
+	boolean 	_waitPoll(uint8_t r, uint8_t f, uint8_t timeout=15);//from adafruit add settable timeout
 	void 		_waitBusy(uint8_t res=0x80);//0x80, 0x40(BTE busy), 0x01(DMA busy)
 
 	#if defined(NEEDS_SET_MODULE)//for Energia

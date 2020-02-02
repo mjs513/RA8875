@@ -176,7 +176,7 @@ void RA8875::selectCS(uint8_t module)
 	module: sets the SPI interface (it depends from MCU). Default:0
 */
 /**************************************************************************/
-void RA8875::begin(const enum RA8875sizes s,uint8_t colors, uint32_t SPIMaxSpeed ) 
+void RA8875::begin(const enum RA8875sizes s,uint8_t colors, uint32_t SPIMaxSpeed, uint32_t SPIMaxReadSpeed )
 {
 	_errorCode = 0;
 	_displaySize = s;
@@ -191,6 +191,7 @@ void RA8875::begin(const enum RA8875sizes s,uint8_t colors, uint32_t SPIMaxSpeed
 	_enabledInterrups = 0b00000000;
 	#if defined(SPI_HAS_TRANSACTION)
 	_SPIMaxSpeed = SPIMaxSpeed;	
+	_SPIMaxReadSpeed = SPIMaxReadSpeed;
 	#endif
 	/* used to understand wat causes an INT
 	bit
@@ -667,6 +668,9 @@ void RA8875::_initialize()
 			_SPIMaxSpeed = MAXSPISPEED;
 		#endif
 	}
+    if (_SPIMaxReadSpeed == (uint32_t)-1) {
+		_SPIMaxReadSpeed = MAXSPIREADSPEED;
+	}
 	_SPITransactionSpeed = _SPIMaxSpeed;
 	//Serial.printf("SPI Transaction speed: %d Max Speed:%d\n", _SPITransactionSpeed, _SPIMaxSpeed);
 	#endif
@@ -761,15 +765,22 @@ uint8_t RA8875::errorCode(void)
 	return true when register has done the job, otherwise false.
 */
 /**************************************************************************/
-boolean RA8875::_waitPoll(uint8_t regname, uint8_t waitflag) 
+boolean RA8875::_waitPoll(uint8_t regname, uint8_t waitflag, uint8_t timeout) 
 {
 	uint8_t temp;
-	unsigned long timeout = millis();
+	unsigned long start_time = millis();
 	
 	while (1) {
 		temp = _readRegister(regname);
-		if (!(temp & waitflag)) return true;
-		if ((millis() - timeout) > 20) return false;//emergency exit!
+		if (!(temp & waitflag)) {
+			//unsigned long delta_time = millis() - timeout;
+			//if ((delta_time > 10) || (waitflag == RA8875_DCR_CIRCLE_STATUS)) Serial.printf("+_waitPoll %x %x %d\n", temp, waitflag, delta_time);
+			return true;
+		}
+		if ((millis() - start_time) > timeout) {
+			//Serial.printf("TO _waitPoll %x %x\n", temp, waitflag);
+			return false;//emergency exit!
+		}
 	}  
 	return false;
 }
@@ -3557,7 +3568,7 @@ void RA8875::drawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t c
 	_line_addressing(x0,y0,x1,y1);
 	
 	_writeRegister(RA8875_DCR,0x80);
-	_waitPoll(RA8875_DCR, RA8875_DCR_LINESQUTRI_STATUS);
+	_waitPoll(RA8875_DCR, RA8875_DCR_LINESQUTRI_STATUS, _RA8875_WAITPOLL_TIMEOUT_DCR_LINESQUTRI_STATUS);
 }
 
 /**************************************************************************/
@@ -3878,7 +3889,7 @@ void RA8875::fillWindow(uint16_t color)
 	setForegroundColor(color);
 	writeCommand(RA8875_DCR);
 	_writeData(0xB0);
-	_waitPoll(RA8875_DCR, RA8875_DCR_LINESQUTRI_STATUS);
+	_waitPoll(RA8875_DCR, RA8875_DCR_LINESQUTRI_STATUS, _RA8875_WAITPOLL_TIMEOUT_DCR_LINESQUTRI_STATUS);
 	#if defined(USE_RA8875_SEPARATE_TEXT_COLOR)
 		_TXTrecoverColor = true;
 	#endif
@@ -4399,7 +4410,7 @@ void RA8875::_circle_helper(int16_t x0, int16_t y0, int16_t r, uint16_t color, b
 		_slowDownSPI(true);
 	#endif
 	filled == true ? _writeData(RA8875_DCR_CIRCLE_START | RA8875_DCR_FILL) : _writeData(RA8875_DCR_CIRCLE_START | RA8875_DCR_NOFILL);
-	_waitPoll(RA8875_DCR, RA8875_DCR_CIRCLE_STATUS);//ZzZzz
+	_waitPoll(RA8875_DCR, RA8875_DCR_CIRCLE_STATUS, _RA8875_WAITPOLL_TIMEOUT_DCR_CIRCLE_STATUS);//ZzZzz
 	#if defined(_FASTCPU)
 		_slowDownSPI(false);
 	#endif
@@ -4460,7 +4471,7 @@ void RA8875::_rect_helper(int16_t x1, int16_t y1, int16_t x2, int16_t y2, uint16
 
 		writeCommand(RA8875_DCR);
 		filled == true ? _writeData(0xB0) : _writeData(0x90);
-		_waitPoll(RA8875_DCR, RA8875_DCR_LINESQUTRI_STATUS);
+		_waitPoll(RA8875_DCR, RA8875_DCR_LINESQUTRI_STATUS, _RA8875_WAITPOLL_TIMEOUT_DCR_LINESQUTRI_STATUS);
 	}
 }
 
@@ -4560,7 +4571,7 @@ void RA8875::_triangle_helper(int16_t x0, int16_t y0, int16_t x1, int16_t y1, in
 	writeCommand(RA8875_DCR);
 	filled == true ? _writeData(0xA1) : _writeData(0x81);
 	
-	_waitPoll(RA8875_DCR, RA8875_DCR_LINESQUTRI_STATUS);
+	_waitPoll(RA8875_DCR, RA8875_DCR_LINESQUTRI_STATUS, _RA8875_WAITPOLL_TIMEOUT_DCR_LINESQUTRI_STATUS);
 }
 
 /**************************************************************************/
@@ -4604,7 +4615,7 @@ void RA8875::_ellipseCurve_helper(int16_t xCenter, int16_t yCenter, int16_t long
 	} else {
 		filled == true ? _writeData(0xC0) : _writeData(0x80);
 	}
-	_waitPoll(RA8875_ELLIPSE, RA8875_ELLIPSE_STATUS);
+	_waitPoll(RA8875_ELLIPSE, RA8875_ELLIPSE_STATUS, _RA8875_WAITPOLL_TIMEOUT_ELLIPSE_STATUS);
 }
 
 
@@ -4644,7 +4655,7 @@ void RA8875::_roundRect_helper(int16_t x, int16_t y, int16_t w, int16_t h, int16
 
 	writeCommand(RA8875_ELLIPSE);
 	filled == true ? _writeData(0xE0) : _writeData(0xA0);
-	_waitPoll(RA8875_ELLIPSE, RA8875_DCR_LINESQUTRI_STATUS);
+	_waitPoll(RA8875_ELLIPSE, RA8875_DCR_LINESQUTRI_STATUS, _RA8875_WAITPOLL_TIMEOUT_DCR_LINESQUTRI_STATUS);
 }
 
 /**************************************************************************/
@@ -5893,7 +5904,8 @@ void  RA8875::writeData16(uint16_t data)
 uint8_t RA8875::_readData(bool stat) 
 {
 	#if defined(SPI_HAS_TRANSACTION)
-		if (_inited) _SPITransactionSpeed = _SPIMaxSpeed / 2;
+		//Serial.printf("RA8875::_readData _SPIMaxSpeed: %d\n", _SPIMaxSpeed);
+		if (_inited) _SPITransactionSpeed = _SPIMaxReadSpeed;
 	#else
 		#if defined(___DUESTUFF) && defined(SPI_DUE_MODE_EXTENDED)
 			if (_inited) SPI.setClockDivider(_cs,SPI_SPEED_READ);
