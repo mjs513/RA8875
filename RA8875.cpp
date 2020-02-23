@@ -1351,6 +1351,7 @@ void RA8875::setExtFontFamily(enum RA8875extRomFamily erf,boolean setReg)
 /**************************************************************************/
 void RA8875::setFont(enum RA8875fontSource s) 
 {
+	_use_int_font = 1;
 	if (!_textMode) _setTextMode(true);//we are in graph mode?
 	_TXTparameters &= ~(1 << 7);//render OFF
 	if (s == INTFONT){
@@ -1409,6 +1410,7 @@ void RA8875::_setFNTdimensions(uint8_t index)
 /**************************************************************************/
 void RA8875::setFont(const tFont *font) 
 {
+	_use_tfont = 1;
 	_currentFont = font;
 	_FNTheight = 		_currentFont->font_height;
 	_FNTwidth = 		_currentFont->font_width;//if 0 it's variable width font
@@ -6676,6 +6678,9 @@ int16_t RA8875::strPixelLen(const char * str)
 void RA8875::charBounds(char c, int16_t *x, int16_t *y,
   int16_t *minx, int16_t *miny, int16_t *maxx, int16_t *maxy) {
 
+  	uint8_t offset, _x, _y;
+	int charW = 0;
+
 	// BUGBUG:: Not handling offset/clip
     if (font) {
         if(c == '\n') { // Newline?
@@ -6770,8 +6775,91 @@ void RA8875::charBounds(char c, int16_t *x, int16_t *y,
             }
         }
 
-    } else { // Default font
+    } else { //  font test int, tfont default
+	  if(_use_tfont == 1){
+		if (bitRead(_TXTparameters,0) == 1) offset = 3 * _scaleY;
 
+		if (c == 13){//------------------------------- CARRIAGE ----------------------------------
+			//ignore
+		} else if (c == 10){//------------------------- NEW LINE ---------------------------------
+			if (!_portrait){
+				_x = 0;
+				_y += (_FNTheight * _scaleY) + _FNTinterline + offset;
+			} else {
+				_x += (_FNTheight * _scaleY) + _FNTinterline + offset;
+				_y = 0;
+			}
+			//#if defined(FORCE_RA8875_TXTREND_FOLLOW_CURS)
+			//	_textPosition(_x,_y,false);
+			//#endif
+		} else if (c == 32){//--------------------------- SPACE ---------------------------------
+		Serial.println("Got Space");
+			if (!_portrait){
+			//	fillRect(_x,_y,(_spaceCharWidth * _scaleX),(_FNTheight * _scaleY),bcolor);//bColor
+				_x += (_spaceCharWidth * _scaleX) + _FNTspacing;
+			} else {
+			//	fillRect(_y,_x,(_spaceCharWidth * _scaleX),(_FNTheight * _scaleY),bcolor);//bColor
+				_y += (_spaceCharWidth * _scaleX) + _FNTspacing;
+			}
+			
+			// #if defined(FORCE_RA8875_TXTREND_FOLLOW_CURS)
+				// _textPosition(_x,_y,false);
+			// #endif
+		} 
+		else {//-------------------------------------- CHAR ------------------------------------
+			int charIndex = _getCharCode(c);//get char code
+			if (charIndex > -1){//valid?
+				charW = 0;
+				//get charW and glyph
+				#if defined(_FORCE_PROGMEM__)
+					#if defined(ESP8266)
+						charW = FPSTR(&_currentFont->chars[charIndex].image->image_width);
+						#if !defined(_RA8875_TXTRNDOPTIMIZER)
+							const uint8_t * charGlyp = FPSTR(&_currentFont->chars[charIndex].image->data);
+						#endif
+					#else
+						charW = PROGMEM_read(&_currentFont->chars[charIndex].image->image_width);
+						#if !defined(_RA8875_TXTRNDOPTIMIZER)
+							const uint8_t * charGlyp = PROGMEM_read(&_currentFont->chars[charIndex].image->data);
+						#endif
+					#endif
+				#else
+					charW = _currentFont->chars[charIndex].image->image_width;
+					#if !defined(_RA8875_TXTRNDOPTIMIZER)
+						const uint8_t * charGlyp = _currentFont->chars[charIndex].image->data;
+					#endif
+				#endif
+			}
+		}
+		
+		*x += charW * _scaleX;
+		*y = _FNTheight * _scaleY;
+		int x2 = *x + charW * _scaleX - 1, // Lower-right pixel of char
+			y2 = *y + _FNTheight * _scaleY - 1;
+		if(x2 > *maxx) *maxx = x2;      // Track max x, y
+		if(y2 > *maxy) *maxy = y2;
+		if(*x < *minx) *minx = *x;      // Track min x, y
+		if(*y < *miny) *miny = *y;
+	  } else if(_use_int_font == 1){
+        if(c == '\n') {                     // Newline?
+            *x  = 0;                        // Reset x to zero,
+            *y += _FNTheight*_scaleY;           // advance y one line
+            // min/max x/y unchaged -- that waits for next 'normal' character
+        } else if(c != '\r') {  // Normal char; ignore carriage returns
+            if(wrap && ((*x + _FNTheight*_scaleY) > _width)) { // Off right?
+                *x  = 0;                    // Reset x to zero,
+                *y += _FNTheight*_scaleY;       // advance y one line
+            }
+            int x2 = *x + _FNTwidth*_scaleX - 1, // Lower-right pixel of char
+                y2 = *y + _FNTheight*_scaleY - 1;
+            if(x2 > *maxx) *maxx = x2;      // Track max x, y
+            if(y2 > *maxy) *maxy = y2;
+            if(*x < *minx) *minx = *x;      // Track min x, y
+            if(*y < *miny) *miny = *y;
+            *x += _FNTwidth*_scaleX ;             // Advance x one char
+		}
+		  
+	  } else {
         if(c == '\n') {                     // Newline?
             *x  = 0;                        // Reset x to zero,
             *y += textsize_y * 8;           // advance y one line
@@ -6788,7 +6876,8 @@ void RA8875::charBounds(char c, int16_t *x, int16_t *y,
             if(*x < *minx) *minx = *x;      // Track min x, y
             if(*y < *miny) *miny = *y;
             *x += textsize_x * 6;             // Advance x one char
-        }
+		}
+	  }
     }
 }
 

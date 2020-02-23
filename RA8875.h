@@ -355,6 +355,8 @@ class RA8875 : public Print
 		}
 		_use_ili_font=0; 
 		_use_gfx_font=0;
+		_use_int_font=1;
+		_use_tfont=0;
 		setActiveWindow();
 		_textPosition(_cursorX, _cursorY, false);
 		};
@@ -722,8 +724,9 @@ using Print::write;
 	#endif
  private:
  //HACK
-	uint8_t _use_gfx_font = 0;
 	uint8_t  _use_ili_font = 0;
+	uint8_t _use_tfont = 0;
+	uint8_t  _use_int_font = 0;
 	uint8_t _use_default = 1;
 	uint8_t textsize, textsize_x, textsize_y;
 	uint16_t textcolor, textbgcolor; 
