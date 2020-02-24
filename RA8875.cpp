@@ -6828,9 +6828,9 @@ void RA8875::charBounds(char c, int16_t *x, int16_t *y,
 		}
 		
 		*x += _x + charW * _scaleX;
-		*y = _y + _FNTheight * _scaleY;
+		*y = _y + (_FNTheight) * _scaleY;
 		int x2 = *x + charW * _scaleX - 1, // Lower-right pixel of char
-			y2 = *y + _FNTheight * _scaleY - 1;
+			y2 = *y + (_FNTheight+3) * _scaleY - 1;
 		if(x2 > *maxx) *maxx = x2;      // Track max x, y
 		if(y2 > *maxy) *maxy = y2;
 		if(*x < *minx) *minx = *x;      // Track min x, y
