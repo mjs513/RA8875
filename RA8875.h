@@ -725,6 +725,7 @@ using Print::write;
  private:
  //HACK
 	uint8_t  _use_ili_font = 0;
+	uint8_t _use_gfx_font = 0;
 	uint8_t _use_tfont = 0;
 	uint8_t  _use_int_font = 0;
 	uint8_t _use_default = 1;
