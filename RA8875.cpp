@@ -1353,8 +1353,9 @@ void RA8875::setFont(enum RA8875fontSource s)
 {
 	_use_int_font = 1;
 	_use_tfont = 0;
-	_use_int_font = 0;
-	_use_tfont = 0;
+	_use_ili_font = 0;
+	_use_gfx_font = 0;
+
 	
 	if (!_textMode) _setTextMode(true);//we are in graph mode?
 	_TXTparameters &= ~(1 << 7);//render OFF
@@ -1416,8 +1417,8 @@ void RA8875::setFont(const tFont *font)
 {
 	_use_tfont = 1;
 	_use_int_font = 0;
-	_use_int_font = 0;
-	_use_tfont = 0;
+	_use_ili_font = 0;
+	_use_gfx_font = 0;
 	
 	_currentFont = font;
 	_FNTheight = 		_currentFont->font_height;
