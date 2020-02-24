@@ -1353,6 +1353,9 @@ void RA8875::setFont(enum RA8875fontSource s)
 {
 	_use_int_font = 1;
 	_use_tfont = 0;
+	_use_int_font = 0;
+	_use_tfont = 0;
+	
 	if (!_textMode) _setTextMode(true);//we are in graph mode?
 	_TXTparameters &= ~(1 << 7);//render OFF
 	if (s == INTFONT){
@@ -1413,6 +1416,9 @@ void RA8875::setFont(const tFont *font)
 {
 	_use_tfont = 1;
 	_use_int_font = 0;
+	_use_int_font = 0;
+	_use_tfont = 0;
+	
 	_currentFont = font;
 	_FNTheight = 		_currentFont->font_height;
 	_FNTwidth = 		_currentFont->font_width;//if 0 it's variable width font
@@ -6230,7 +6236,9 @@ void RA8875::setFont(const ILI9341_t3_font_t &f) {
 	}
 	_use_ili_font = 1;
 	_use_gfx_font = 0;
-
+	_use_int_font = 1;
+	_use_tfont = 0;
+	
 	_gfx_last_char_x_write = 0;	// Don't use cached data here
 	font = &f;
 	if (gfxFont) {
@@ -6260,6 +6268,8 @@ void RA8875::setFont(const GFXfont *f) {
 	}
 	_use_gfx_font = 1;
 	_use_ili_font = 0;
+	_use_int_font = 0;
+	_use_tfont = 0;
 	font = NULL;	// turn off the other font... 
 	_gfx_last_char_x_write = 0;	// Don't use cached data here
 	if (f == gfxFont) return;	// same font or lack of so can bail.
