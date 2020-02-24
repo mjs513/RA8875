@@ -26,6 +26,7 @@ typedef struct {
 
 
 const ili_fonts_test_t font_test_list[] = {
+  {nullptr, nullptr,  "Internal Font", RA8875_RED, RA8875_YELLOW},
   {&Arial_14, nullptr,  "Arial_14", RA8875_WHITE, RA8875_WHITE},
   {&Arial_14_Bold, nullptr,  "ArialBold 14", RA8875_YELLOW, RA8875_YELLOW},
   {&ComicSansMS_14, nullptr,  "ComicSansMS 14", RA8875_GREEN, RA8875_GREEN},
@@ -136,7 +137,8 @@ void loop()
     else
       tft.setTextColor(font_test_list[font_index].font_fg_color);
     if (font_test_list[font_index].ili_font) tft.setFont(*font_test_list[font_index].ili_font);
-    else tft.setFont(font_test_list[font_index].gfx_font);
+    else if (font_test_list[font_index].gfx_font)  tft.setFont(font_test_list[font_index].gfx_font);
+    else tft.setFont(INTFONT);
     tft.println(font_test_list[font_index].font_name);
     displayStuff1();
   }
@@ -198,7 +200,16 @@ uint32_t displayStuff1()
   tft.setCursor(50, CENTER);
   tft.print("YCENTR");
   
-
+  // Lets see how close the getTextBounds gets the bounds of the text
+  rect_x = 200;
+  rect_y += 25; //center 
+  static const char rectText[] = "RectText";
+  int16_t xT, yT, wT, hT;
+  tft.getTextBounds(rectText, rect_x, rect_y, &xT, &yT, &wT, &hT);
+  Serial.printf("getTextBounds: (%d, %d): %d %d %d %d\n", rect_x, rect_y, xT, yT, wT, hT);
+  tft.setCursor(rect_x, rect_y);
+  tft.print(rectText);
+  tft.drawRect(xT, yT, wT, hT, RA8875_CYAN);
 
   tft.setCursor(cursorX, cursorY);
   static const char alternating_text[] = "AbCdEfGhIjKlMnOpQrStUvWxYz\raBcDeFgHiJkLmNoPqRsTuVwXyZ";
