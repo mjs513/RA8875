@@ -441,6 +441,11 @@ void RA8875::begin(const enum RA8875sizes s,uint8_t colors, uint32_t SPIMaxSpeed
 			_errorCode |= (1 << 1);//set
 			return;
 		}
+		// Make sure we select the right pins.  
+		// On T4 does nothing, and on T4.1 only miso matters, but just in case.
+		_pspi->setMISO(_miso);
+		_pspi->setMOSI(_mosi);
+		_pspi->setSCK(_sclk);
 		pinMode(_cs, OUTPUT);
 		_pspi->begin();
 		digitalWrite(_cs, HIGH);
