@@ -6696,7 +6696,7 @@ int16_t RA8875::strPixelLen(const char * str)
 void RA8875::charBounds(char c, int16_t *x, int16_t *y,
   int16_t *minx, int16_t *miny, int16_t *maxx, int16_t *maxy) {
 
-  	uint8_t offset, _x, _y;
+	uint8_t offset=0, _x, _y;
 	int charW = 0;
 
 	// BUGBUG:: Not handling offset/clip
