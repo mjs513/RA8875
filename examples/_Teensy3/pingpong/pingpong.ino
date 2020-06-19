@@ -199,7 +199,7 @@ boolean inPaddle(int16_t x, int16_t y, int16_t rectX, int16_t rectY, uint8_t rec
 
 void paddleRead(void) {
   //uint16_t test = random(100,1024);
-  uint16_t test = 700;
+  //uint16_t test = 700;
 #if defined(USE_FT5206_TOUCH)
   if (tft.touched()) {
     tft.updateTS();

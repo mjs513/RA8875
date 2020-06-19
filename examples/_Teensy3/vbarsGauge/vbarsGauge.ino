@@ -101,7 +101,7 @@ boolean createBar(uint16_t origX, uint16_t origY) {
 uint16_t createBars(uint16_t origX, uint8_t origY) {
   uint16_t i;
   uint16_t currentX;
-  uint16_t resBar;
+  uint16_t resBar=0;
   uint16_t maxW = tft.width()-(_spacer+_barWidth);
   for (i = 0; i < maxW; i++) { //create the bars
     currentX = origX + (i * _barWidth) + (i * _spacer);

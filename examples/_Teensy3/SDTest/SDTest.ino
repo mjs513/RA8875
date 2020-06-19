@@ -148,7 +148,8 @@ void bmpDraw(const char *filename, uint16_t x, uint16_t y) {
               buffidx = 0; // Set index to beginning
             }
             
-            rowBuffer[col] = tft.Color565(sdbuffer[buffidx++], sdbuffer[buffidx++], sdbuffer[buffidx++]);
+            rowBuffer[col] = tft.Color565(sdbuffer[buffidx], sdbuffer[buffidx+1], sdbuffer[buffidx+2]);
+            buffidx = buffidx + 3;
           } // end pixel
           tft.setY(y + row);
           tft.drawPixels(rowBuffer, w, x, y + row);
