@@ -31,6 +31,9 @@ You are using 4 wire SPI here, so:
 
 RA8875 tft = RA8875(RA8875_CS,RA8875_RESET);//Teensy3/arduino's
 
+#if !defined(USE_RA8875_TOUCH) || defined(_AVOID_TOUCHSCREEN)
+#error "you need to enable resistive touchscreen by uncommenting USE_RA8875_TOUCH in settings!"
+#endif
 
 uint16_t tx, ty;
 

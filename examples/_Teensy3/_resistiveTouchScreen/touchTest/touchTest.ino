@@ -17,6 +17,9 @@ You are using 4 wire SPI here, so:
 #define RA8875_CS 10 // Can be any digital pin
 #define RA8875_RESET 9 //any pin or nothing!
 
+#if !defined(USE_RA8875_TOUCH) || defined(_AVOID_TOUCHSCREEN)
+#error "you need to enable resistive touchscreen by uncommenting USE_RA8875_TOUCH in settings!"
+#endif
 
 static uint16_t tx, ty;//used as temp
 uint16_t  txPrev = 0xffff;
