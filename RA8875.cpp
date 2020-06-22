@@ -603,6 +603,9 @@ void RA8875::begin(const enum RA8875sizes s,uint8_t colors, uint32_t SPIMaxSpeed
 		//TO DO
 		//Modify RA8875 registers and disconnect internal Touch Screen totally
 	#endif
+	
+	if(_displaySize == Adafruit_480x272 || _displaySize == Adafruit_800x480 ) GPIOX(true);
+
 }
 
 
