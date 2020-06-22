@@ -56,7 +56,7 @@ void setup() {
   while (!Serial && ((millis () - debug_start) <= 5000)) ;
   Serial.println("Setup");
   //  begin display: Choose from: RA8875_480x272, RA8875_800x480, RA8875_800x480ALT, Adafruit_480x272, Adafruit_800x480
-  tft.begin(Adafruit_800x480);
+  tft.begin(Adafruit_800x480, 16, 15000000);
 
   tft.setRotation(4);
   tft.fillWindow(RA8875_BLACK);
@@ -140,6 +140,7 @@ void loop()
     else if (font_test_list[font_index].gfx_font)  tft.setFont(font_test_list[font_index].gfx_font);
     else tft.setFont(INTFONT);
     tft.println(font_test_list[font_index].font_name);
+    Serial.println(font_test_list[font_index].font_name);
     displayStuff1();
   }
   nextPage();
@@ -204,7 +205,8 @@ uint32_t displayStuff1()
   rect_x = 200;
   rect_y += 25; //center 
   static const char rectText[] = "RectText";
-  int16_t xT, yT, wT, hT;
+  int16_t xT, yT; 
+  uint16_t wT, hT;
   tft.getTextBounds(rectText, rect_x, rect_y, &xT, &yT, &wT, &hT);
   Serial.printf("getTextBounds: (%d, %d): %d %d %d %d\n", rect_x, rect_y, xT, yT, wT, hT);
   tft.setCursor(rect_x, rect_y);
