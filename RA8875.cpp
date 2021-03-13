@@ -6021,16 +6021,16 @@ void RA8875::_fontWrite(const uint8_t* buffer, uint16_t len)
 	  	// Note we may want to play with the x ane y returned if they offset some
 		if (_absoluteCenter && strngWidth > 0){//Avoid operations for strngWidth = 0
 			_absoluteCenter = false;
-			_cursorX = _cursorX - ((x + strngWidth) / 2);
-			_cursorY = _cursorY - ((y + strngHeight) / 2);
+			_cursorX = _cursorX - (x + strngWidth / 2);
+			_cursorY = _cursorY - (y + strngHeight / 2);
 		} else if (_relativeCenter && strngWidth > 0){//Avoid operations for strngWidth = 0
 			_relativeCenter = false;
 			if (bitRead(_TXTparameters,5)) {//X = center
-				_cursorX = (_width / 2) - ((x + strngWidth) / 2);
+				_cursorX = (_width / 2) - (x + strngWidth / 2);
 				_TXTparameters &= ~(1 << 5);//reset
 			}
 			if (bitRead(_TXTparameters,6)) {//Y = center
-				_cursorY = (_height / 2) - ((y + strngHeight) / 2) ;
+				_cursorY = (_height / 2) - (y + strngHeight / 2) ;
 				_TXTparameters &= ~(1 << 6);//reset
 			}
 		}
@@ -6743,7 +6743,7 @@ void RA8875::charBounds(char c, int16_t *x, int16_t *y,
 
             int16_t
                     x1 = *x + xoffset,
-                    y1 = *y + yoffset,
+                    y1 = *y + font->cap_height - height - yoffset,
                     x2 = x1 + width,
                     y2 = y1 + height;
 
