@@ -411,7 +411,7 @@ class RA8875 : public Print
 	}
 
 	inline void forceCombinedPixelsOut() {
-		if (_combine_count)fillRect(_combine_x_start, _combine_y, _combine_count, 1, _combine_color);
+		if (_combine_count)clippedFillRect(_combine_x_start, _combine_y, _combine_count, 1, _combine_color);
 		_combine_count = 0;
 	}
 
@@ -496,6 +496,7 @@ class RA8875 : public Print
 	void 		drawLineAngle(int16_t x, int16_t y, int16_t angle, uint16_t start, uint16_t length, uint16_t color,int offset = -90);
 	void    	drawRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color);
 	void    	fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color);
+	void    	clippedFillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color);
 	void 		writeRect(int16_t x, int16_t y, int16_t w, int16_t h, const uint16_t *pcolors);
 	void    	drawCircle(int16_t x0, int16_t y0, int16_t r, uint16_t color);
 	void    	fillCircle(int16_t x0, int16_t y0, int16_t r, uint16_t color);

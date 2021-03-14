@@ -3747,6 +3747,38 @@ void RA8875::fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color
 	}
 }
 
+void RA8875::clippedFillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t color)
+{
+	x += _originx;
+	y += _originy;
+
+	// Rectangular clipping (drawChar w/big text requires this)
+	if ((x >= _displayclipx2) || (y >= _displayclipy2))
+	return;
+	if (((x + w) <= _displayclipx1) || ((y + h) <= _displayclipy1))
+	return;
+	if (x < _displayclipx1) {
+		w -= (_displayclipx1 - x);
+		x = _displayclipx1;
+	}
+	if (y < _displayclipy1) {
+		h -= (_displayclipy1 - y);
+		y = _displayclipy1;
+	}
+	if ((x + w - 1) >= _displayclipx2)
+		w = _displayclipx2 - x;
+	if ((y + h - 1) >= _displayclipy2)
+		h = _displayclipy2 - y;
+
+	//RA8875 it's not out-of-range tolerant so this is a workaround
+	if (w < 1 || h < 1) return;//it cannot be!
+	if (w < 2 && h < 2){ //render as pixel
+		drawPixel(x,y,color);
+	} else {			 //render as rect
+		//Serial.printf("        fillRect: %d %d %d %d %x\n", x, y, w, h, color);
+		_rect_helper(x,y,(x+w)-1,(y+h)-1,color,true);//thanks the experimentalist
+	}
+}
 
 /**************************************************************************/
 /*!
@@ -6562,7 +6594,7 @@ void RA8875::drawFontChar(unsigned int c)
 			
 			// clear below character
 			setActiveWindow();  //have to do this otherwise it gets clipped
-			fillRect(_cursorX, screen_y, delta, _cursorY + font->line_space - screen_y, _TXTBackColor);
+			clippedFillRect(_cursorX, screen_y, delta, _cursorY + font->line_space - screen_y, _TXTBackColor);
 
 		} // anti-aliased
 
@@ -6573,7 +6605,7 @@ void RA8875::drawFontChar(unsigned int c)
 			// figure out bounding rectangle... 
 			// In this mode we need to update to use the offset and bounding rectangles as we are doing it it direct.
 			// also update the Origin 
-			fillRect(_cursorX, _cursorY, delta, y - _cursorY, _TXTBackColor);
+			clippedFillRect(_cursorX, _cursorY, delta, y - _cursorY, _TXTBackColor);
 			while (linecount > 0) {
 				//Serial.printf("    linecount = %d\n", linecount);
 				uint32_t n = 1;
@@ -6582,7 +6614,7 @@ void RA8875::drawFontChar(unsigned int c)
 					bitoffset += 3;
 				}
 				uint32_t x = 0;
-				fillRect(_cursorX, y, origin_x - _cursorX, n, _TXTBackColor);
+				clippedFillRect(_cursorX, y, origin_x - _cursorX, n, _TXTBackColor);
 				do {
 					int32_t xsize = width - x;
 					if (xsize > 32) xsize = 32;
@@ -6594,7 +6626,7 @@ void RA8875::drawFontChar(unsigned int c)
 				} while (x < width);
 
 				if ((width+xoffset) < delta) {
-					fillRect(origin_x + x, y, delta - (width+xoffset), n, _TXTBackColor);
+					clippedFillRect(origin_x + x, y, delta - (width+xoffset), n, _TXTBackColor);
 				}
 				y += n;
 				linecount -= n;
@@ -6603,7 +6635,7 @@ void RA8875::drawFontChar(unsigned int c)
 					//break;
 				//}
 			}
-			fillRect(_cursorX, y, delta, _cursorY + font->line_space - y, _TXTBackColor);
+			clippedFillRect(_cursorX, y, delta, _cursorY + font->line_space - y, _TXTBackColor);
 		}
 	}
 	// Increment to setup for the next character.
@@ -6960,7 +6992,7 @@ void RA8875::drawFontBits(bool opaque, uint32_t bits, uint32_t numbits, int32_t 
 			if (bits & (1 << n)) {
 				if (bgw>0) {
 					if (opaque) {
-						fillRect(x1 - bgw, y, bgw, repeat, _TXTBackColor);
+						clippedFillRect(x1 - bgw, y, bgw, repeat, _TXTBackColor);
 						//Serial.printf("        BG fillrect: %d %d %d %d %x\n", x1 - bgw, y, bgw, repeat, _TXTBackColor);
 					}
 					bgw=0;
@@ -6968,7 +7000,7 @@ void RA8875::drawFontBits(bool opaque, uint32_t bits, uint32_t numbits, int32_t 
 				w++;
 			} else {
 				if (w>0) {
-					fillRect(x1 - w, y, w, repeat, _TXTForeColor);
+					clippedFillRect(x1 - w, y, w, repeat, _TXTForeColor);
 					//Serial.printf("        FG fillrect: %d %d %d %d %x\n", x1 - w, y, w, repeat, _TXTForeColor);
 					w = 0;
 				}
@@ -6978,13 +7010,13 @@ void RA8875::drawFontBits(bool opaque, uint32_t bits, uint32_t numbits, int32_t 
 		} while (n > 0);
 
 		if (w > 0) {
-			fillRect(x1 - w, y, w, repeat, _TXTForeColor);
+			clippedFillRect(x1 - w, y, w, repeat, _TXTForeColor);
 			//Serial.printf("        FG fillrect: %d %d %d %d %x\n", x1 - w, y, w, repeat, _TXTForeColor);
 		}
 
 		if (bgw > 0) {
 			if (opaque) {
-				fillRect(x1 - bgw, y, bgw, repeat, _TXTBackColor);
+				clippedFillRect(x1 - bgw, y, bgw, repeat, _TXTBackColor);
 				//Serial.printf("        BG fillrect: %d %d %d %d %x\n", x1 - bgw, y, bgw, repeat, _TXTBackColor);
 			}
 		}
